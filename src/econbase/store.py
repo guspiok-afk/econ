@@ -15,8 +15,10 @@ Rules (ADR-0001):
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import json
+import logging
 import os
 import shutil
 from collections.abc import Iterable, Sequence
@@ -29,8 +31,11 @@ import pyarrow.parquet as pq
 
 from econbase import schemas
 
+log = logging.getLogger(__name__)
+
 MANIFEST_NAME = "manifest.json"
 DB_NAME = "econbase.duckdb"
+LOCK_NAME = ".writer.lock"
 
 
 class StoreError(RuntimeError):
@@ -54,7 +59,15 @@ class Manifest:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise StoreError(f"corrupt manifest {path}: {exc}") from exc
+            prev = path.with_name(f"{path.name}.prev")
+            raise StoreError(
+                f"corrupt manifest {path}: {exc}. "
+                + (
+                    f"Recover the previous run with: copy {prev} to {path}"
+                    if prev.exists()
+                    else "No .prev backup found; rebuild from raw/ or the backup copy."
+                )
+            ) from exc
         return cls(
             schema_version=data.get("schema_version", schemas.SCHEMA_VERSION),
             catalog_hash=data.get("catalog_hash"),
@@ -64,9 +77,21 @@ class Manifest:
         )
 
     def dump(self, path: Path) -> None:
-        """Write atomically: temp file in the same directory, then ``os.replace``."""
+        """Write durably: fsynced temp file, previous manifest kept, then ``os.replace``.
+
+        The ``.prev`` copy is the recovery path if a crash between write and rename ever
+        leaves the live manifest unreadable (:meth:`load` falls back to it).
+        """
         tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}")
-        tmp.write_text(json.dumps(asdict(self), indent=2, sort_keys=True), encoding="utf-8")
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(asdict(self), indent=2, sort_keys=True))
+            fh.flush()
+            os.fsync(fh.fileno())
+        if path.exists():
+            try:
+                shutil.copy2(path, path.with_name(f"{path.name}.prev"))
+            except OSError:  # a missing backup must never block a valid commit
+                log.warning("could not refresh %s.prev", path.name)
         os.replace(tmp, path)
 
     def files_for(self, table: str) -> list[str]:
@@ -96,8 +121,85 @@ def _duck_type(t: pa.DataType) -> str:
     raise StoreError(f"no DuckDB type mapping for {t}")
 
 
+def _as_id_list(series_ids: Iterable[str]) -> list[str]:
+    """Series-id filters must be a collection, never a bare string (which would iterate chars)."""
+    if isinstance(series_ids, str):
+        raise StoreError(f"series_ids must be a collection, got the string {series_ids!r}")
+    return list(series_ids)
+
+
+def _fsync_file(path: Path) -> None:
+    """Best-effort flush of a closed file to disk (Windows needs a writable handle)."""
+    try:
+        with open(path, "r+b") as fh:
+            os.fsync(fh.fileno())
+    except OSError as exc:  # never fail a write because the platform refused an fsync
+        log.debug("fsync skipped for %s: %s", path, exc)
+
+
 def _sql_str(s: str) -> str:
     return "'" + s.replace("'", "''") + "'"
+
+
+class WriterLock:
+    """Exclusive, advisory lock for the single writer (ADR-0003).
+
+    One process at a time may write the lake. The lock is a file created with ``O_EXCL``; it
+    records the pid and run id so a leftover lock names its owner. A lock older than
+    ``stale_after`` is taken over (a crashed run never blocks the scheduler forever).
+    """
+
+    def __init__(self, path: Path, *, run_id: str, stale_after: dt.timedelta | None = None) -> None:
+        self.path = path
+        self.run_id = run_id
+        self.stale_after = stale_after or dt.timedelta(hours=6)
+        self._held = False
+
+    def _payload(self) -> str:
+        return json.dumps(
+            {
+                "pid": os.getpid(),
+                "run_id": self.run_id,
+                "acquired_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+            }
+        )
+
+    def acquire(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            age = dt.datetime.now(dt.UTC).timestamp() - self.path.stat().st_mtime
+            if age <= self.stale_after.total_seconds():
+                try:
+                    owner = self.path.read_text(encoding="utf-8").strip()
+                except OSError:
+                    owner = "unknown"
+                raise StoreError(
+                    f"another writer holds {self.path} ({owner}); "
+                    "wait for it to finish, or delete the file if no update is running"
+                ) from None
+            log.warning("taking over stale writer lock %s (age %.0f s)", self.path, age)
+            with contextlib.suppress(FileNotFoundError):
+                self.path.unlink()
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(self._payload())
+        self._held = True
+
+    def release(self) -> None:
+        if not self._held:
+            return
+        with contextlib.suppress(FileNotFoundError):
+            self.path.unlink()
+        self._held = False
+
+    def __enter__(self) -> WriterLock:
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.release()
 
 
 class Store:
@@ -120,6 +222,11 @@ class Store:
     @property
     def db_path(self) -> Path:
         return self.db_dir / DB_NAME
+
+    @property
+    def lock_path(self) -> Path:
+        """Writer lock: held by the single process allowed to modify the lake."""
+        return self.lake_dir / LOCK_NAME
 
     def manifest(self) -> Manifest:
         return Manifest.load(self.manifest_path)
@@ -160,8 +267,9 @@ class Store:
         )
         con.execute(
             "CREATE OR REPLACE VIEW obs_first_release AS "
-            "SELECT series_id, period, arg_min(value, realtime_start) AS value, "
-            "min(realtime_start) AS realtime_start FROM observations GROUP BY series_id, period"
+            "SELECT * FROM observations "
+            "QUALIFY row_number() OVER (PARTITION BY series_id, period "
+            "ORDER BY realtime_start) = 1"
         )
         con.execute(
             "CREATE OR REPLACE MACRO obs_asof(d) AS TABLE "
@@ -205,7 +313,7 @@ class Store:
         where: list[str] = []
         params: list[object] = []
         if series_ids is not None:
-            ids = list(series_ids)
+            ids = _as_id_list(series_ids)
             if not ids:
                 return schemas.empty_table(schemas.OBSERVATIONS)
             where.append("series_id IN (" + ", ".join("?" for _ in ids) + ")")
@@ -224,16 +332,17 @@ class Store:
         return schemas.ensure_schema(self.query(sql, params), schemas.OBSERVATIONS, "observations")
 
     def first_release(self, series_ids: Iterable[str] | None = None) -> pa.Table:
-        """First published value per (series, period)."""
+        """The row as first published per (series, period), including a NULL first value."""
         sql = "SELECT * FROM obs_first_release"
         params: list[object] = []
         if series_ids is not None:
-            ids = list(series_ids)
+            ids = _as_id_list(series_ids)
             if not ids:
-                return self.query(sql + " WHERE false")
+                return schemas.empty_table(schemas.OBSERVATIONS)
             sql += " WHERE series_id IN (" + ", ".join("?" for _ in ids) + ")"
             params.extend(ids)
-        return self.query(sql + " ORDER BY series_id, period", params)
+        result = self.query(sql + " ORDER BY series_id, period", params)
+        return schemas.ensure_schema(result, schemas.OBSERVATIONS, "observations")
 
     # ------------------------------------------------------------------ writing
     def transaction(self, *, run_id: str, catalog_hash: str | None = None) -> Transaction:
@@ -257,28 +366,33 @@ class Store:
         return self.db_path
 
     def gc(self, *, older_than_days: int = 7, now: dt.datetime | None = None) -> list[Path]:
-        """Delete Parquet files no manifest references and stale staging dirs older than N days."""
+        """Delete Parquet files no manifest references and stale staging dirs older than N days.
+
+        Runs under the writer lock so a concurrent commit cannot have its just-promoted files
+        judged against a manifest read a moment earlier.
+        """
         now = now or dt.datetime.now(dt.UTC)
         cutoff = now.timestamp() - older_than_days * 86400
-        live = self.manifest().all_files()
         deleted: list[Path] = []
-        for path in self.lake_dir.rglob("*.parquet"):
-            if self.staging_dir in path.parents:
-                continue
-            rel = path.relative_to(self.lake_dir).as_posix()
-            if rel in live:
-                continue
-            if path.stat().st_mtime < cutoff:
-                path.unlink()
-                deleted.append(path)
-        for d in list(self.staging_dir.iterdir()) if self.staging_dir.exists() else []:
-            if d.is_dir() and d.stat().st_mtime < cutoff:
-                shutil.rmtree(d, ignore_errors=True)
-                deleted.append(d)
-        for tmp in self.lake_dir.glob(f"{MANIFEST_NAME}.tmp-*"):
-            if tmp.stat().st_mtime < cutoff:
-                tmp.unlink()
-                deleted.append(tmp)
+        with WriterLock(self.lock_path, run_id=f"gc-{int(now.timestamp())}"):
+            live = self.manifest().all_files()
+            for path in self.lake_dir.rglob("*.parquet"):
+                if self.staging_dir in path.parents:
+                    continue
+                rel = path.relative_to(self.lake_dir).as_posix()
+                if rel in live:
+                    continue
+                if path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    deleted.append(path)
+            for d in list(self.staging_dir.iterdir()) if self.staging_dir.exists() else []:
+                if d.is_dir() and d.stat().st_mtime < cutoff:
+                    shutil.rmtree(d, ignore_errors=True)
+                    deleted.append(d)
+            for tmp in self.lake_dir.glob(f"{MANIFEST_NAME}.tmp-*"):
+                if tmp.stat().st_mtime < cutoff:
+                    tmp.unlink()
+                    deleted.append(tmp)
         return deleted
 
 
@@ -292,8 +406,16 @@ class Transaction:
         self.store = store
         self.run_id = run_id
         self.catalog_hash = catalog_hash
-        self.staging = store.staging_dir / run_id
-        self.staging.mkdir(parents=True, exist_ok=True)
+        self._lock = WriterLock(store.lock_path, run_id=run_id)
+        self._lock.acquire()
+        try:
+            # optimistic guard: the manifest must not move under us between here and commit
+            self._base_run_id = store.manifest().run_id
+            self.staging = store.staging_dir / run_id
+            self.staging.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            self._lock.release()
+            raise
         self._staged: list[tuple[Path, str]] = []  # (staged path, final relative path)
         self._replace_prefixes: dict[str, set[str]] = {}  # table -> prefixes replaced
         self.committed = False
@@ -303,6 +425,7 @@ class Transaction:
         staged = self.staging / rel
         staged.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(data, staged, compression="zstd")
+        _fsync_file(staged)  # durable before any manifest can point at it
         self._staged.append((staged, rel))
 
     def replace_partition(self, table: str, value: str, data: pa.Table) -> None:
@@ -332,6 +455,11 @@ class Transaction:
         if self.committed:
             raise StoreError("transaction already committed")
         manifest = self.store.manifest()
+        if manifest.run_id != self._base_run_id:
+            raise StoreError(
+                f"the manifest changed during this run (was {self._base_run_id!r}, "
+                f"now {manifest.run_id!r}); another writer committed. Refusing to overwrite it."
+            )
         # 1. move staged files into the lake (new names, never overwriting live files)
         for staged, rel in self._staged:
             final = self.store.lake_dir / rel
@@ -340,8 +468,15 @@ class Transaction:
         # 2. compute the new file lists
         files = {t: list(v) for t, v in manifest.files.items()}
         for table, prefixes in self._replace_prefixes.items():
-            kept = [f for f in files.get(table, []) if not any(f.startswith(p) for p in prefixes)]
+            kept, dropped = [], []
+            for f in files.get(table, []):
+                (dropped if any(f.startswith(p) for p in prefixes) else kept).append(f)
             files[table] = kept
+            for rel in dropped:  # gc ages orphans from when they became garbage, not from write
+                orphan = self.store.lake_dir / rel
+                if orphan.exists():
+                    with contextlib.suppress(OSError):
+                        os.utime(orphan, None)
         for _, rel in self._staged:
             table = rel.split("/", 1)[0]
             files.setdefault(table, []).append(rel)
@@ -358,12 +493,14 @@ class Transaction:
             files=files,
         )
         new.dump(self.store.manifest_path)
-        shutil.rmtree(self.staging, ignore_errors=True)
         self.committed = True
+        shutil.rmtree(self.staging, ignore_errors=True)
+        self._lock.release()
         return new
 
     def rollback(self) -> None:
         shutil.rmtree(self.staging, ignore_errors=True)
+        self._lock.release()
 
     def __enter__(self) -> Transaction:
         return self

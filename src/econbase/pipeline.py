@@ -1,9 +1,14 @@
-"""The update pipeline: fetch -> archive raw -> bitemporal diff -> commit; plus the freshness check.
+"""The update pipeline: fetch raw -> archive -> parse -> bitemporal diff -> commit; and the check.
 
 Vintage semantics (ADR-0002): for sources without native vintages, :func:`apply_snapshot`
 compares the incoming picture with the currently open rows and closes/opens intervals with
 ``realtime_start = run date``. For vintaged sources, :func:`apply_vintages` upserts the
 intervals the source publishes.
+
+Everything here refuses loudly rather than writing something that cannot be repaired later:
+Parquet is the system of record and history is never edited, so a bad diff is permanent.
+Each guard raises, the run records the error against that one series, and the partition keeps
+the state it had.
 """
 
 from __future__ import annotations
@@ -26,7 +31,7 @@ import pyarrow as pa
 from econbase import schemas
 from econbase.catalog import Catalog, SeriesSpec, path_safe
 from econbase.settings import DEFAULT_TZ
-from econbase.sources.base import FetchResult, Source
+from econbase.sources.base import RawResponse, Source
 from econbase.store import Store
 
 log = logging.getLogger(__name__)
@@ -37,6 +42,8 @@ VALUE_ATOL = 1e-12
 #: of the open periods) before the pipeline refuses, to survive truncated API responses.
 MAX_VANISH_ABS = 10
 MAX_VANISH_FRACTION = 0.5
+#: Sources use a far-future date to mean "still current" (FRED: 9999-12-31). Stored as NULL.
+OPEN_END_SENTINEL = dt.date(9999, 12, 31)
 
 
 # ---------------------------------------------------------------------------- run identity
@@ -50,25 +57,7 @@ def run_date_for(now: dt.datetime, tz: str = DEFAULT_TZ) -> dt.date:
     return now.astimezone(ZoneInfo(tz)).date()
 
 
-# ---------------------------------------------------------------------------- helpers
-def values_equal(a: pd.Series, b: pd.Series) -> np.ndarray:
-    """Element-wise equality with NaN == NaN and a tiny absolute tolerance."""
-    x = pd.to_numeric(a, errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
-    y = pd.to_numeric(b, errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
-    both_nan = np.isnan(x) & np.isnan(y)
-    return both_nan | np.isclose(x, y, rtol=0.0, atol=VALUE_ATOL, equal_nan=False)
-
-
-def _to_dates(s: pd.Series) -> pd.Series:
-    """Any date-like column to python ``date`` objects (object dtype), NaT -> None."""
-    if pd.api.types.is_datetime64_any_dtype(s):
-        out = s.dt.date
-    else:
-        out = s.map(lambda v: v.date() if isinstance(v, dt.datetime) else v)
-    out = out.astype(object)
-    return out.where(out.notna(), None)
-
-
+# ---------------------------------------------------------------------------- redaction
 _SECRET_PARAM_RE = re.compile(
     r"((?:api[_-]?key|apikey|access[_-]?token|token|secret|password|passwd|pwd|key)=)([^&\s\"']+)",
     re.IGNORECASE,
@@ -91,22 +80,93 @@ def _safe_ext(ext: str | None) -> str:
     return _RAW_EXT_RE.sub("", ext or "") or "bin"
 
 
+# ---------------------------------------------------------------------------- helpers
+def values_equal(a: pd.Series, b: pd.Series) -> np.ndarray:
+    """Element-wise equality with NaN == NaN and a tiny absolute tolerance."""
+    x = pd.to_numeric(a, errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
+    y = pd.to_numeric(b, errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
+    both_nan = np.isnan(x) & np.isnan(y)
+    return both_nan | np.isclose(x, y, rtol=0.0, atol=VALUE_ATOL, equal_nan=False)
+
+
+def _to_dates(s: pd.Series, *, column: str = "date") -> pd.Series:
+    """Any date-like column to python ``date`` objects (object dtype), missing -> ``None``.
+
+    Strict on purpose: a connector that returns ISO strings, ``pd.Period`` or numbers gets a
+    clear error here instead of an Arrow cast failure later, which would abort the whole run.
+    """
+    if pd.api.types.is_datetime64_any_dtype(s):
+        out = s.dt.date
+    else:
+        parsed = []
+        for v in s:
+            if v is None or (isinstance(v, float) and np.isnan(v)) or v is pd.NaT:
+                parsed.append(None)
+            elif isinstance(v, dt.datetime):
+                parsed.append(v.date())
+            elif isinstance(v, dt.date):
+                parsed.append(v)
+            elif isinstance(v, pd.Timestamp):
+                parsed.append(v.date())
+            else:
+                raise ValueError(
+                    f"column {column!r}: expected datetime.date, got {type(v).__name__} {v!r}; "
+                    "connectors must parse dates before returning a frame"
+                )
+        out = pd.Series(parsed, index=s.index, dtype=object)
+    out = out.astype(object)
+    return out.where(out.notna(), None)
+
+
+def _as_date(value: object, label: str) -> dt.date:
+    """Accept anything date-like from a connector and return a plain ``datetime.date``.
+
+    ``pd.Timestamp`` is a ``datetime`` subclass whose comparison with ``date`` raises, so it
+    must be normalized before it reaches the window filters.
+    """
+    if isinstance(value, pd.Timestamp):
+        return value.date()
+    if isinstance(value, dt.datetime):
+        return value.date()
+    if isinstance(value, dt.date):
+        return value
+    raise ValueError(f"{label} must be a datetime.date, got {type(value).__name__} {value!r}")
+
+
 def _normalize_incoming(frame: pd.DataFrame, *, vintaged: bool) -> pd.DataFrame:
     cols = ["period", "value"] + (["realtime_start", "realtime_end"] if vintaged else [])
     missing = [c for c in ("period", "value") if c not in frame.columns]
     if missing:
         raise ValueError(f"incoming frame lacks columns {missing}")
     if vintaged and "realtime_end" not in frame.columns:
-        frame = frame.assign(realtime_end=None)
+        raise ValueError(
+            "a vintaged frame must carry 'realtime_end' (use None for the open interval); "
+            "omitting it would silently reopen closed vintages"
+        )
     inc = frame[cols].copy()
-    inc["period"] = _to_dates(inc["period"])
+    inc["period"] = _to_dates(inc["period"], column="period")
     inc = inc[inc["period"].notna()]
     # fail loudly on non-numeric values: connectors own the parsing, the store never guesses
     inc["value"] = pd.to_numeric(inc["value"], errors="raise").astype("float64")
     if vintaged:
-        inc["realtime_start"] = _to_dates(inc["realtime_start"])
+        inc["realtime_start"] = _to_dates(inc["realtime_start"], column="realtime_start")
         inc = inc[inc["realtime_start"].notna()]
-        inc["realtime_end"] = _to_dates(inc["realtime_end"])
+        inc["realtime_end"] = _to_dates(inc["realtime_end"], column="realtime_end")
+        # a far-future end date means "still current" (FRED sends 9999-12-31)
+        inc["realtime_end"] = inc["realtime_end"].map(
+            lambda d: None if d is not None and d >= OPEN_END_SENTINEL else d
+        )
+        bad = [
+            (p, s, e)
+            for p, s, e in zip(
+                inc["period"], inc["realtime_start"], inc["realtime_end"], strict=True
+            )
+            if e is not None and e <= s
+        ]
+        if bad:
+            raise ValueError(
+                f"{len(bad)} vintage interval(s) end at or before they start, e.g. {bad[0]}"
+            )
         inc = inc.drop_duplicates(["period", "realtime_start"], keep="last")
         inc = inc.sort_values(["period", "realtime_start"])
     else:
@@ -124,9 +184,44 @@ def _coerce_obs_frame(df: pd.DataFrame) -> pd.DataFrame:
         return _empty_obs()
     out = df.copy()
     for c in ("period", "realtime_start", "realtime_end"):
-        out[c] = _to_dates(out[c])
+        out[c] = _to_dates(out[c], column=c)
     out["value"] = pd.to_numeric(out["value"], errors="coerce").astype("float64")
     return out[OBS_COLS].reset_index(drop=True)
+
+
+def check_invariants(frame: pd.DataFrame, series_id: str) -> None:
+    """Raise unless the rows of ``series_id`` form a valid bitemporal history.
+
+    Invariants (CONTRACT.md): the logical key ``(series_id, period, realtime_start)`` is unique;
+    every period has at most one open row; closed intervals are non-empty and, per period, do
+    not overlap.
+    """
+    mine = frame[frame["series_id"] == series_id]
+    if mine.empty:
+        return
+    dup = mine.duplicated(["period", "realtime_start"]).sum()
+    if dup:
+        raise ValueError(f"{series_id}: {dup} duplicated (period, realtime_start) row(s)")
+    open_per_period = mine[mine["realtime_end"].isna()].groupby("period").size()
+    many = open_per_period[open_per_period > 1]
+    if len(many):
+        raise ValueError(
+            f"{series_id}: {len(many)} period(s) with more than one open row, e.g. {many.index[0]}"
+        )
+    for period, grp in mine.groupby("period"):
+        rows = grp.sort_values("realtime_start")
+        starts = list(rows["realtime_start"])
+        ends = list(rows["realtime_end"])
+        for i, (s, e) in enumerate(zip(starts, ends, strict=True)):
+            if e is not None and e <= s:
+                raise ValueError(f"{series_id} {period}: interval [{s}, {e}) is empty or inverted")
+            if i + 1 < len(starts):
+                if e is None:
+                    raise ValueError(
+                        f"{series_id} {period}: open interval from {s} precedes {starts[i + 1]}"
+                    )
+                if e > starts[i + 1]:
+                    raise ValueError(f"{series_id} {period}: intervals overlap at {starts[i + 1]}")
 
 
 # ---------------------------------------------------------------------------- diff logic
@@ -153,28 +248,54 @@ def apply_snapshot(
     Rows of other series pass through untouched. Within the covered window, a period whose
     value changed is closed and re-opened with today's date; a period the source no longer
     publishes is closed; a period opened today and changed again today is replaced in place
-    so ``(series_id, period, realtime_start)`` stays unique.
+    so ``(series_id, period, realtime_start)`` stays unique. ``covers_from`` restricts the diff
+    in *both* directions: stored periods before it are left alone and incoming periods before
+    it are ignored, so a windowed fetch can never create a second open row.
     """
     current = _coerce_obs_frame(current)
     inc = _normalize_incoming(incoming, vintaged=False)
+    if len(inc) == 0:
+        raise ValueError(
+            f"{series_id}: no usable rows after normalization; refusing to close open periods"
+        )
     mine = current["series_id"] == series_id
     others = current[~mine]
     cur = current[mine]
+
+    if len(cur):
+        late_open = cur["realtime_start"].map(lambda d: d > run_date).any()
+        late_close = cur["realtime_end"].map(lambda d: d is not None and d > run_date).any()
+        if late_open or late_close:
+            raise ValueError(
+                f"{series_id}: run date {run_date} is earlier than an existing vintage; "
+                "refusing to write inverted intervals (clock or run-order problem)"
+            )
+
     is_open = cur["realtime_end"].isna()
     closed_rows = cur[~is_open]
     open_rows = cur[is_open]
 
     if covers_from is not None:
-        in_window = open_rows["period"].map(lambda p: p >= covers_from)
+        covers_from = _as_date(covers_from, "covers_from")
+        in_window = open_rows["period"].map(lambda p: p >= covers_from).astype(bool)
         untouched = open_rows[~in_window]
         consider = open_rows[in_window]
+        inc = inc[inc["period"].map(lambda p: p >= covers_from).astype(bool)].reset_index(drop=True)
+        if len(inc) == 0:
+            raise ValueError(
+                f"{series_id}: every returned period is before covers_from={covers_from}; "
+                "refusing to close open periods"
+            )
     else:
         untouched = open_rows.iloc[0:0]
         consider = open_rows
 
-    merged = consider[["period", "value"]].merge(
-        inc, on="period", how="outer", suffixes=("_cur", "_new"), indicator=True
+    left = (
+        consider[["period", "value"]]
+        if len(consider)
+        else pd.DataFrame({"period": pd.Series(dtype=object), "value": pd.Series(dtype="float64")})
     )
+    merged = left.merge(inc, on="period", how="outer", suffixes=("_cur", "_new"), indicator=True)
     both = merged["_merge"] == "both"
     same = pd.Series(values_equal(merged["value_cur"], merged["value_new"]), index=merged.index)
     unchanged = set(merged.loc[both & same, "period"])
@@ -182,15 +303,13 @@ def apply_snapshot(
     vanished = set(merged.loc[merged["_merge"] == "left_only", "period"])
     new = set(merged.loc[merged["_merge"] == "right_only", "period"])
 
-    if len(consider) and consider["realtime_start"].map(lambda d: d > run_date).any():
-        raise ValueError(
-            f"{series_id}: run date {run_date} is earlier than an existing vintage; "
-            "refusing to write inverted intervals (clock or run-order problem)"
-        )
-    if len(vanished) > max(MAX_VANISH_ABS, MAX_VANISH_FRACTION * len(consider)):
+    if vanished and (
+        len(vanished) == len(consider)
+        or len(vanished) > max(MAX_VANISH_ABS, MAX_VANISH_FRACTION * len(consider))
+    ):
         raise ValueError(
             f"{series_id}: source dropped {len(vanished)} of {len(consider)} open periods; "
-            "refusing to close them (truncated response? set FetchResult.covers_from)"
+            "refusing to close them (truncated response? set RawResponse.covers_from)"
         )
 
     keep_open = consider[consider["period"].isin(unchanged)]
@@ -218,6 +337,7 @@ def apply_snapshot(
 
     parts = [p for p in (others, closed_rows, untouched, keep_open, to_close, inserts) if len(p)]
     result = pd.concat(parts, ignore_index=True)[OBS_COLS] if parts else _empty_obs()
+    check_invariants(result, series_id)
     counts = DiffCounts(
         rows_fetched=len(inc),
         rows_new=len(new),
@@ -235,14 +355,17 @@ def apply_vintages(
     observed_at: dt.datetime,
     run_id: str,
 ) -> tuple[pd.DataFrame, DiffCounts]:
-    """Upsert vintaged rows (``period, value, realtime_start[, realtime_end]``) for ``series_id``.
+    """Upsert vintaged rows (``period, value, realtime_start, realtime_end``) for ``series_id``.
 
     Keys present in both keep their identity; ``realtime_end`` and ``value`` take the incoming
     value when it differs (the source is the authority on its own vintages). Keys only in the
     store are kept as they are. Rows that change carry the current ``observed_at``/``run_id``.
+    The result must satisfy the bitemporal invariants or nothing is written.
     """
     current = _coerce_obs_frame(current)
     inc = _normalize_incoming(incoming, vintaged=True)
+    if len(inc) == 0:
+        raise ValueError(f"{series_id}: no usable vintage rows after normalization")
     mine = current["series_id"] == series_id
     others = current[~mine]
     cur = current[mine]
@@ -280,10 +403,11 @@ def apply_vintages(
             "run_id": [run_id if t else c for t, c in zip(touched, merged["run_id"], strict=True)],
         }
     )
-    rows["realtime_end"] = _to_dates(rows["realtime_end"])
+    rows["realtime_end"] = _to_dates(rows["realtime_end"], column="realtime_end")
     rows["observed_at"] = pd.to_datetime(rows["observed_at"], utc=True)
     parts = [p for p in (others, rows) if len(p)]
     result = pd.concat(parts, ignore_index=True)[OBS_COLS] if parts else _empty_obs()
+    check_invariants(result, series_id)
     counts = DiffCounts(
         rows_fetched=len(inc),
         rows_new=int(new.sum()),
@@ -357,15 +481,15 @@ def _last_raw_sha(store: Store) -> dict[str, str]:
 def _archive_raw(
     store: Store,
     spec: SeriesSpec,
-    result: FetchResult,
+    raw: RawResponse,
     *,
     run_id: str,
     fetched_at: dt.datetime,
     previous_sha: str | None,
 ) -> tuple[dict[str, object], str]:
-    body = result.raw_body or b""
+    body = raw.body or b""
     sha = hashlib.sha256(body).hexdigest()
-    rel = f"{spec.source}/{path_safe(spec.series_id)}/{run_id}.{_safe_ext(result.raw_ext)}.gz"
+    rel = f"{spec.source}/{path_safe(spec.series_id)}/{run_id}.{_safe_ext(raw.ext)}.gz"
     stored = sha != previous_sha
     if stored:
         target = store.raw_dir / rel
@@ -377,7 +501,7 @@ def _archive_raw(
         "series_id": spec.series_id,
         "run_id": run_id,
         "fetched_at": fetched_at,
-        "url": redact(result.url),
+        "url": redact(raw.url),
         "sha256": sha,
         "bytes": len(body),
         "path": rel,
@@ -449,8 +573,13 @@ def update(
 ) -> RunSummary:
     """Run one update over the selected series and commit it as a single run.
 
-    ``now`` is injectable for deterministic tests; it must be timezone-aware.
+    Per series: ``fetch_raw`` -> archive the bytes -> ``parse`` -> bitemporal diff. Archiving
+    happens before parsing and also when parsing fails, so a connector bug is always
+    recoverable from ``raw/``. Any failure is recorded against that series alone; the
+    partition keeps the state it had. ``now`` is injectable for deterministic tests.
     """
+    if trigger not in schemas.TRIGGERS:
+        raise ValueError(f"trigger must be one of {schemas.TRIGGERS}, got {trigger!r}")
     started = now or dt.datetime.now(dt.UTC)
     if started.tzinfo is None:
         raise ValueError("now must be timezone-aware")
@@ -489,24 +618,25 @@ def update(
                 t0 = perf_counter()
                 outcome = SeriesOutcome(spec.series_id, source_name)
                 try:
-                    result = source.fetch(spec, since=None)
-                    if result.raw_body is not None:
+                    raw = source.fetch_raw(spec, since=None)
+                    if raw.body is not None:
                         row, sha = _archive_raw(
                             store,
                             spec,
-                            result,
+                            raw,
                             run_id=run_id,
                             fetched_at=observed_at,
                             previous_sha=previous_sha.get(spec.series_id),
                         )
                         raw_rows.append(row)
                         outcome.raw_sha256 = sha
-                    frame = result.frame
+                    frame = source.parse(raw, spec)
                     if frame is None or len(frame) == 0:
                         outcome.error = "empty response; no changes applied"
                     else:
-                        if result.has_vintages:
-                            part, counts = apply_vintages(
+                        vintaged = "realtime_start" in frame.columns
+                        if vintaged:
+                            candidate, counts = apply_vintages(
                                 part,
                                 frame,
                                 series_id=spec.series_id,
@@ -514,20 +644,23 @@ def update(
                                 run_id=run_id,
                             )
                         else:
-                            part, counts = apply_snapshot(
+                            candidate, counts = apply_snapshot(
                                 part,
                                 frame,
                                 series_id=spec.series_id,
                                 run_date=run_date,
                                 observed_at=observed_at,
                                 run_id=run_id,
-                                covers_from=result.covers_from,
+                                covers_from=raw.covers_from,
                             )
+                        # convert here so a bad frame fails this series, not the whole run
+                        schemas.from_pandas(candidate, schemas.OBSERVATIONS, "observations")
+                        part = candidate
                         outcome.apply(counts)
                         touched.add(spec.series_id)
                         partition_touched = True
                 except Exception as exc:  # one series must never abort the run
-                    log.error("fetch failed for %s: %s", spec.series_id, redact(str(exc)))
+                    log.error("update failed for %s: %s", spec.series_id, redact(str(exc)))
                     outcome.error = redact(f"{type(exc).__name__}: {exc}")
                 outcome.duration_ms = int((perf_counter() - t0) * 1000)
                 outcomes.append(outcome)

@@ -15,6 +15,9 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_TZ = "America/Sao_Paulo"
+#: ``.env`` next to the installed package's repository root, so a scheduled task started from
+#: any working directory still finds the maintainer's configuration.
+REPO_ENV = Path(__file__).resolve().parents[2] / ".env"
 
 
 def default_data_dir() -> Path:
@@ -32,7 +35,7 @@ class Settings(BaseSettings):
     """Settings read from the environment (case-insensitive) and from ``.env``."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", REPO_ENV),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,

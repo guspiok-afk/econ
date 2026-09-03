@@ -91,12 +91,13 @@ Delivered on branch `wp/01-foundation` (2026-09-03), 4 commits, 56 tests, ruff c
 Deviations from the contract: none. Deferred by design (see plan): `api.py`, `transforms.py`,
 connectors, `daily.ps1` (WP-02/03).
 
-Review status: the multi-lens adversarial review workflow could not run (API overloaded,
-three attempts). An architect self-review was performed instead and produced the fixes in
-commits 3 and 4 (guards, redaction, id baseline, gc minimum, tzdata). The independent review
-remains a to-do before or right after merge; re-run it with the saved workflow script.
+Review status: complete. The multi-lens adversarial review ran on 2026-09-03 (5 reviewers,
+3 judges per finding, majority rules): 41 findings raised, 16 confirmed, 25 rejected or
+unjudged. All confirmed findings, plus four unjudged edge cases that reproduced, were fixed
+on branch `fix/wp-01-review` (PR #2) with 26 regression tests; each fix was verified by
+disabling it and watching the matching test fail.
 
 Open questions for the maintainer: none blocking. Follow-ups: WP-02 (connectors + shared
 HTTP helper + FRED thin client), WP-03 (transforms, `api.get`, `daily.ps1`, Task Scheduler).
-Note for WP-03: `daily.ps1` must `Set-Location` to the repository root before calling
-`econbase`, otherwise `.env` is not found.
+Note for WP-03: `daily.ps1` no longer needs a `Set-Location`; settings resolve `.env` from
+the repository root as well as the current directory.

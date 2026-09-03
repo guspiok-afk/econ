@@ -23,7 +23,9 @@ schema version bump: additive columns = minor, rename/type change = major plus a
 
 Parquet is the system of record. Readers resolve the file list from `manifest.json`, never by
 globbing, so a writer can add files and swap the manifest atomically while readers hold old
-files open. Files are never modified in place; `econbase gc` deletes files no manifest
+files open. Writing takes an exclusive lock (`lake/.writer.lock`, stale after 6 hours) and a
+commit is refused if the manifest moved since the transaction started; the previous manifest
+is kept as `manifest.json.prev` for recovery. Files are never modified in place; `econbase gc` deletes files no manifest
 references. Partitioning: `observations` by `source` only, rewritten whole per run; all other
 tables are single-file and rewritten per run. Compression ZSTD.
 
@@ -47,9 +49,14 @@ vintages (FRED/ALFRED) copy their intervals verbatim. Sources without them get
 `realtime_start = fetch date in ECONBASE_TZ` (pseudo real-time, labelled as such in any
 backtest).
 
+An `realtime_end` of `9999-12-31` (the open-ended sentinel used by FRED) is stored as NULL.
+Every write is validated: the logical key is unique, a period has at most one open row, and
+per period the intervals are non-empty and do not overlap.
+
 Standard queries (views/macros in every connection): `obs_latest` (`realtime_end IS NULL`),
 `obs_asof(d)` (`realtime_start <= d AND (realtime_end IS NULL OR realtime_end > d)`),
-`obs_first_release` (row with the minimum `realtime_start` per `(series_id, period)`).
+`obs_first_release` (the whole row with the minimum `realtime_start` per `(series_id, period)`,
+so a first release published as missing reads back as NULL, not as a later revision).
 
 ### series
 `series_id, entity_id, concept_id (nullable), source, native_id, title, unit, scale (float64),
