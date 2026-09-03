@@ -166,11 +166,13 @@ Opção A, Aider (Python; usa um interpretador 3.12 gerenciado pelo uv):
 uv tool install --python 3.12 aider-chat
 $env:OLLAMA_API_BASE = "http://127.0.0.1:11434"
 cd C:\dev\econ
-aider --model ollama_chat/qwen3-coder:30b --read AGENTS.md --read docs/work-packages/WP-NN-slug.md
+aider --model ollama_chat/qwen3-coder:30b --no-auto-commits --no-dirty-commits --read AGENTS.md --read docs/work-packages/WP-NN-slug.md
 ```
 
 Opção B, OpenCode (https://opencode.ai): instalar conforme o site, configurar o provedor
 `ollama` apontando para `http://127.0.0.1:11434` e o modelo `qwen3-coder:30b`.
+
+Substitua `WP-NN-slug.md` pelo arquivo real do pacote; sem um WP pronto, teste o modelo com um comando somente leitura dentro do Aider, por exemplo `/ask Resuma a seção 2 do AGENTS.md em 5 linhas`, e saia com `/exit`. As opções `--no-auto-commits --no-dirty-commits` impedem o Aider de commitar sozinho: commits e PRs seguem o fluxo do WP.
 
 Regras para tarefas Ollama: sempre pequenas, com teste pronto, em branch própria; você revisa o
 diff antes de qualquer commit. Nunca núcleo, schema ou lógica de vintage.

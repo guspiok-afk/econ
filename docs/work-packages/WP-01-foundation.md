@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | in progress |
+| Status | in review (awaiting maintainer merge decision) |
 | Suggested executor | `agent:claude` (touches only protected files) |
 | Branch | `wp/01-foundation` |
 | Issue | (repository not published yet) |
@@ -72,4 +72,31 @@ Run: `uv run pytest -q`
 
 ## Result
 
-(filled in at the end of the WP)
+Delivered on branch `wp/01-foundation` (2026-09-03), 4 commits, 56 tests, ruff clean.
+
+- Contract: `docs/CONTRACT.md`, `docs/IDENTIFIERS.md`, ADR-0001..0006, `schemas.py`
+  (`SCHEMA_VERSION = 1.0.0`, six tables, `ensure_schema`/`from_pandas`).
+- `catalog.py`: pydantic specs, id grammar, `(entity, concept)` uniqueness, aliases with
+  `DeprecationWarning`, `catalog_hash`, `catalog/ids.txt` baseline guard.
+- `store.py`: Parquet as truth, staged writes, atomic manifest, views `obs_latest`,
+  `obs_first_release`, macro `obs_asof(d)`, `rebuild_db`, `gc` (min 1 day in the CLI).
+- `pipeline.py`: raw HTTP archive with hash dedupe, `apply_snapshot` (ALFRED intervals,
+  same-day collapse, `covers_from` window), `apply_vintages` (upsert of native vintages),
+  guards (inverted interval, mass close > max(10, 50%), non-numeric values), credential
+  redaction in persisted URLs/errors, `runs`/`run_series`, `check()` freshness.
+- `cli.py`: `init | list | search | check | update | rebuild-db | gc`, non-zero exit codes.
+- `econmodels/base.py`: `ConceptRequest`, `RunContext`, `Result`, `Model`, registry.
+- `.github/workflows/ci.yml` (tests only), `scripts/backup.ps1`, `docs/MANUAL.md`.
+
+Deviations from the contract: none. Deferred by design (see plan): `api.py`, `transforms.py`,
+connectors, `daily.ps1` (WP-02/03).
+
+Review status: the multi-lens adversarial review workflow could not run (API overloaded,
+three attempts). An architect self-review was performed instead and produced the fixes in
+commits 3 and 4 (guards, redaction, id baseline, gc minimum, tzdata). The independent review
+remains a to-do before or right after merge; re-run it with the saved workflow script.
+
+Open questions for the maintainer: none blocking. Follow-ups: WP-02 (connectors + shared
+HTTP helper + FRED thin client), WP-03 (transforms, `api.get`, `daily.ps1`, Task Scheduler).
+Note for WP-03: `daily.ps1` must `Set-Location` to the repository root before calling
+`econbase`, otherwise `.env` is not found.
