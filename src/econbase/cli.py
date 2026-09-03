@@ -178,7 +178,9 @@ def rebuild_db() -> None:
 
 @app.command()
 def gc(
-    days: Annotated[int, typer.Option(help="Delete unreferenced files older than N days.")] = 7,
+    days: Annotated[
+        int, typer.Option(min=1, help="Delete unreferenced files older than N days (min 1).")
+    ] = 7,
 ) -> None:
     """Delete Parquet files no manifest references (and stale staging dirs)."""
     settings = get_settings()

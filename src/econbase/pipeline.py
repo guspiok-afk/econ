@@ -12,6 +12,7 @@ import datetime as dt
 import gzip
 import hashlib
 import logging
+import re
 import secrets
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
@@ -66,6 +67,28 @@ def _to_dates(s: pd.Series) -> pd.Series:
         out = s.map(lambda v: v.date() if isinstance(v, dt.datetime) else v)
     out = out.astype(object)
     return out.where(out.notna(), None)
+
+
+_SECRET_PARAM_RE = re.compile(
+    r"((?:api[_-]?key|apikey|access[_-]?token|token|secret|password|passwd|pwd|key)=)([^&\s\"']+)",
+    re.IGNORECASE,
+)
+_RAW_EXT_RE = re.compile(r"[^A-Za-z0-9]")
+
+
+def redact(text: str | None) -> str | None:
+    """Mask credential-looking query parameters (``api_key=...``) in URLs and messages.
+
+    Applied to everything the pipeline persists that may echo a request: ``raw_index.url`` and
+    ``run_series.error``. The raw HTTP *body* is archived as received (it never carries the key).
+    """
+    if text is None:
+        return None
+    return _SECRET_PARAM_RE.sub(r"\1REDACTED", text)
+
+
+def _safe_ext(ext: str | None) -> str:
+    return _RAW_EXT_RE.sub("", ext or "") or "bin"
 
 
 def _normalize_incoming(frame: pd.DataFrame, *, vintaged: bool) -> pd.DataFrame:
@@ -342,7 +365,7 @@ def _archive_raw(
 ) -> tuple[dict[str, object], str]:
     body = result.raw_body or b""
     sha = hashlib.sha256(body).hexdigest()
-    rel = f"{spec.source}/{path_safe(spec.series_id)}/{run_id}.{result.raw_ext}.gz"
+    rel = f"{spec.source}/{path_safe(spec.series_id)}/{run_id}.{_safe_ext(result.raw_ext)}.gz"
     stored = sha != previous_sha
     if stored:
         target = store.raw_dir / rel
@@ -354,7 +377,7 @@ def _archive_raw(
         "series_id": spec.series_id,
         "run_id": run_id,
         "fetched_at": fetched_at,
-        "url": result.url,
+        "url": redact(result.url),
         "sha256": sha,
         "bytes": len(body),
         "path": rel,
@@ -504,8 +527,8 @@ def update(
                         touched.add(spec.series_id)
                         partition_touched = True
                 except Exception as exc:  # one series must never abort the run
-                    log.exception("fetch failed for %s", spec.series_id)
-                    outcome.error = f"{type(exc).__name__}: {exc}"
+                    log.error("fetch failed for %s: %s", spec.series_id, redact(str(exc)))
+                    outcome.error = redact(f"{type(exc).__name__}: {exc}")
                 outcome.duration_ms = int((perf_counter() - t0) * 1000)
                 outcomes.append(outcome)
             if partition_touched:

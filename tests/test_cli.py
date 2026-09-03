@@ -35,7 +35,7 @@ def test_rebuild_db_and_gc(data_dir: Path) -> None:
     result = runner.invoke(app, ["rebuild-db"])
     assert result.exit_code == 0 and "rebuilt" in result.output
     assert (data_dir / "db" / "econbase.duckdb").exists()
-    result = runner.invoke(app, ["gc", "--days", "0"])
+    result = runner.invoke(app, ["gc", "--days", "1"])
     assert result.exit_code == 0 and "0 item(s) removed" in result.output
 
 

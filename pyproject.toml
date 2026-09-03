@@ -17,6 +17,7 @@ dependencies = [
   "httpx>=0.28",
   "tenacity>=9.0",
   "typer>=0.15",
+  "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
