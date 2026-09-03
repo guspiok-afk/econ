@@ -5,7 +5,7 @@
 | Status | in review (awaiting maintainer merge decision) |
 | Suggested executor | `agent:claude` (touches only protected files) |
 | Branch | `wp/01-foundation` |
-| Issue | (repository not published yet) |
+| Issue | PR [#1](https://github.com/guspiok-afk/econ/pull/1) |
 | Depends on | none |
 | Estimated effort | ~35 h |
 
