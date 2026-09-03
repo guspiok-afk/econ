@@ -1,0 +1,140 @@
+# Canonical concepts. Analyses ask for concepts; the catalog resolves (entity_id, concept_id)
+# to exactly one series_id per country. unit_kind is informational; default_agg is the
+# aggregation used when converting to a lower frequency unless the caller overrides it.
+concepts:
+  cpi_headline:
+    description: Headline consumer price index, monthly percentage change
+    unit_kind: pct
+    default_agg: sum
+  cpi_headline_index:
+    description: Headline consumer price index level
+    unit_kind: index
+    default_agg: mean
+  cpi_core:
+    description: Core consumer price index (ex food and energy or central bank core), monthly percentage change
+    unit_kind: pct
+    default_agg: sum
+  cpi_sticky:
+    description: Sticky-price CPI, annualized monthly percentage change
+    unit_kind: pct
+    default_agg: mean
+  cpi_flexible:
+    description: Flexible-price CPI, annualized monthly percentage change
+    unit_kind: pct
+    default_agg: mean
+  policy_rate:
+    description: Monetary policy target rate, percent per year
+    unit_kind: pct_pa
+    default_agg: eop
+  interbank_rate:
+    description: Effective overnight interbank rate, percent per year
+    unit_kind: pct_pa
+    default_agg: mean
+  swap_1y:
+    description: One-year fixed-for-floating interest rate swap, percent per year
+    unit_kind: pct_pa
+    default_agg: eop
+  govt_yield_2y:
+    description: Two-year government bond yield, percent per year
+    unit_kind: pct_pa
+    default_agg: eop
+  govt_yield_10y:
+    description: Ten-year government bond yield, percent per year
+    unit_kind: pct_pa
+    default_agg: eop
+  gdp_real:
+    description: Real GDP, seasonally adjusted, chained volume
+    unit_kind: level
+    default_agg: sum
+  gdp_nowcast:
+    description: Official or replicated GDP nowcast, annualized quarterly growth
+    unit_kind: pct
+    default_agg: last
+  activity_index:
+    description: Monthly economic activity index (IBC-Br, industrial production)
+    unit_kind: index
+    default_agg: mean
+  industrial_production:
+    description: Industrial production index, seasonally adjusted
+    unit_kind: index
+    default_agg: mean
+  retail_sales:
+    description: Retail sales volume index, seasonally adjusted
+    unit_kind: index
+    default_agg: mean
+  unemployment_rate:
+    description: Unemployment rate, percent of labor force
+    unit_kind: pct
+    default_agg: mean
+  employment:
+    description: Employment level (payrolls or occupied persons)
+    unit_kind: level
+    default_agg: mean
+  wages:
+    description: Average earnings, nominal
+    unit_kind: level
+    default_agg: mean
+  initial_claims:
+    description: Initial unemployment insurance claims
+    unit_kind: level
+    default_agg: sum
+  labor_conditions_index:
+    description: Labor market conditions index (KC Fed LMCI or replicated)
+    unit_kind: index
+    default_agg: mean
+  credit_outstanding:
+    description: Total credit outstanding to the non-financial private sector
+    unit_kind: level
+    default_agg: eop
+  credit_new_loans:
+    description: New loan originations
+    unit_kind: level
+    default_agg: sum
+  credit_rate:
+    description: Average lending rate, percent per year
+    unit_kind: pct_pa
+    default_agg: mean
+  credit_delinquency:
+    description: Non-performing loans ratio, percent
+    unit_kind: pct
+    default_agg: eop
+  fx_spot_usd:
+    description: Spot exchange rate, local currency per USD
+    unit_kind: level
+    default_agg: eop
+  fx_effective_index:
+    description: Nominal effective exchange rate index
+    unit_kind: index
+    default_agg: mean
+  inflation_expectations_12m:
+    description: Survey inflation expectations, next 12 months, percent
+    unit_kind: pct
+    default_agg: last
+  policy_rate_expectations_eoy:
+    description: Survey expectations for the policy rate at year end, percent per year
+    unit_kind: pct_pa
+    default_agg: last
+  consumer_confidence:
+    description: Consumer confidence or sentiment index
+    unit_kind: index
+    default_agg: mean
+  supply_chain_pressure:
+    description: Global Supply Chain Pressure Index (NY Fed), standard deviations from mean
+    unit_kind: index
+    default_agg: mean
+  primary_balance:
+    description: Public sector primary balance, percent of GDP (12-month)
+    unit_kind: pct
+    default_agg: last
+  gross_debt:
+    description: General government gross debt, percent of GDP
+    unit_kind: pct
+    default_agg: eop
+  trade_balance:
+    description: Goods trade balance, USD
+    unit_kind: level
+    default_agg: sum
+  capacity_utilization:
+    description: Capacity utilization, percent
+    unit_kind: pct
+    default_agg: mean

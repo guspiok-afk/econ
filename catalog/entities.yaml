@@ -1,0 +1,14 @@
+# Entities the catalog may reference. Countries use ISO 3166-1 alpha-2.
+entities:
+  - entity_id: BR
+    entity_type: country
+    name: Brazil
+    attributes: { iso3: BRA, currency: BRL, tz: America/Sao_Paulo, calendar: B3 }
+  - entity_id: US
+    entity_type: country
+    name: United States
+    attributes: { iso3: USA, currency: USD, tz: America/New_York, calendar: NYSE }
+  - entity_id: WW
+    entity_type: region
+    name: World / global aggregates
+    attributes: {}
