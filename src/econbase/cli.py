@@ -47,6 +47,7 @@ def _git_sha() -> str | None:
             capture_output=True,
             text=True,
             check=True,
+            cwd=Path(__file__).resolve().parents[2],
             timeout=5,
         )
         return out.stdout.strip() or None

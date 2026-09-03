@@ -32,6 +32,10 @@ log = logging.getLogger(__name__)
 
 OBS_COLS: list[str] = list(schemas.OBSERVATIONS.names)
 VALUE_ATOL = 1e-12
+#: A full-history fetch may close at most this many open periods (absolute and as a fraction
+#: of the open periods) before the pipeline refuses, to survive truncated API responses.
+MAX_VANISH_ABS = 10
+MAX_VANISH_FRACTION = 0.5
 
 
 # ---------------------------------------------------------------------------- run identity
@@ -74,7 +78,8 @@ def _normalize_incoming(frame: pd.DataFrame, *, vintaged: bool) -> pd.DataFrame:
     inc = frame[cols].copy()
     inc["period"] = _to_dates(inc["period"])
     inc = inc[inc["period"].notna()]
-    inc["value"] = pd.to_numeric(inc["value"], errors="coerce").astype("float64")
+    # fail loudly on non-numeric values: connectors own the parsing, the store never guesses
+    inc["value"] = pd.to_numeric(inc["value"], errors="raise").astype("float64")
     if vintaged:
         inc["realtime_start"] = _to_dates(inc["realtime_start"])
         inc = inc[inc["realtime_start"].notna()]
@@ -153,6 +158,17 @@ def apply_snapshot(
     changed = set(merged.loc[both & ~same, "period"])
     vanished = set(merged.loc[merged["_merge"] == "left_only", "period"])
     new = set(merged.loc[merged["_merge"] == "right_only", "period"])
+
+    if len(consider) and consider["realtime_start"].map(lambda d: d > run_date).any():
+        raise ValueError(
+            f"{series_id}: run date {run_date} is earlier than an existing vintage; "
+            "refusing to write inverted intervals (clock or run-order problem)"
+        )
+    if len(vanished) > max(MAX_VANISH_ABS, MAX_VANISH_FRACTION * len(consider)):
+        raise ValueError(
+            f"{series_id}: source dropped {len(vanished)} of {len(consider)} open periods; "
+            "refusing to close them (truncated response? set FetchResult.covers_from)"
+        )
 
     keep_open = consider[consider["period"].isin(unchanged)]
     to_close = consider[consider["period"].isin(changed | vanished)].copy()

@@ -11,7 +11,7 @@ import pyarrow as pa
 import pytest
 
 from econbase.catalog import Catalog
-from econbase.settings import get_settings
+from econbase.settings import Settings, get_settings
 from econbase.sources.base import StaticSource
 from econbase.store import Store
 
@@ -59,6 +59,8 @@ def data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     d = tmp_path / "data"
     monkeypatch.setenv("ECONBASE_DATA_DIR", str(d))
     monkeypatch.delenv("FRED_API_KEY", raising=False)
+    # tests must not read the maintainer's real .env from the repository root
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     get_settings.cache_clear()
     yield d
     get_settings.cache_clear()

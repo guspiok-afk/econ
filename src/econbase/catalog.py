@@ -20,6 +20,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Literal
 
+import pandas as pd
 import pyarrow as pa
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
@@ -380,13 +381,9 @@ class Catalog:
                     "last_updated": None,
                 }
             )
-        import pandas as pd
-
         return schemas.from_pandas(pd.DataFrame(rows), schemas.SERIES, "series")
 
     def entities_table(self) -> pa.Table:
-        import pandas as pd
-
         rows = [
             {
                 "entity_id": e.entity_id,
