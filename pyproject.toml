@@ -18,6 +18,10 @@ dependencies = [
   "tenacity>=9.0",
   "typer>=0.15",
   "tzdata>=2024.1",
+  # spreadsheets published by statistical agencies: openpyxl reads .xlsx, xlrd the
+  # legacy .xls that some of them still serve under an .xlsx name (NY Fed GSCPI)
+  "openpyxl>=3.1",
+  "xlrd>=2.0",
 ]
 
 [project.optional-dependencies]
