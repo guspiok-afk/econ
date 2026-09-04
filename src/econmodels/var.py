@@ -34,6 +34,10 @@ class VectorAutoregression:
         order: tuple[str, str, str] = ("inflation", "output", "policy"),
         identification: str = "cholesky",
     ) -> None:
+        if identification.lower() != "cholesky":
+            raise ValueError(
+                f"Only 'cholesky' identification is currently supported, got '{identification}'."
+            )
         self.entity = entity
         self.lags = lags
         self.max_lags = max_lags
@@ -42,16 +46,17 @@ class VectorAutoregression:
         self.identification = identification
 
     def _get_series(self, panel: pd.DataFrame, concept: str) -> pd.Series:
-        """Locate the column for a concept in the given panel."""
-        target_entity = f"{concept}@{self.entity}"
-        if target_entity in panel.columns:
-            return panel[target_entity]
-        if concept in panel.columns:
+        """Locate the column for a concept and entity in the given panel."""
+        col_name = f"{concept}@{self.entity}"
+        if col_name in panel.columns:
+            return panel[col_name]
+        if concept in panel.columns and not any("@" in str(c) for c in panel.columns):
             return panel[concept]
-        for col in panel.columns:
-            if col.split("@")[0] == concept or col.startswith(concept):
-                return panel[col]
-        raise ValueError(f"Concept '{concept}' for entity '{self.entity}' not found in panel.")
+        cols_str = ", ".join(str(c) for c in panel.columns)
+        raise ValueError(
+            f"Concept '{concept}' for entity '{self.entity}' (expected '{col_name}') "
+            f"not found in panel columns: [{cols_str}]"
+        )
 
     def fit(self, panel: pd.DataFrame, ctx: RunContext) -> Result:
         cpi = self._get_series(panel, "cpi_headline_index")
@@ -59,6 +64,11 @@ class VectorAutoregression:
         policy_rate = self._get_series(panel, "policy_rate")
 
         # Transformations:
+        # Sort index to ensure chronological ordering before shift
+        cpi = cpi.sort_index()
+        gdp = gdp.sort_index()
+        policy_rate = policy_rate.sort_index()
+
         # inflation: 4-quarter log change of price index, times 100
         inflation = 100 * np.log(cpi / cpi.shift(4))
         # output: 100 * log of real GDP
@@ -81,10 +91,15 @@ class VectorAutoregression:
 
         df_var = pd.DataFrame({v: vars_map[v] for v in self.order}).dropna()
 
-        # Check sample size
+        # Check sample size discounting the lags consumed during estimation
         check_lags = self.lags if isinstance(self.lags, int) else self.max_lags
-        if len(df_var) <= check_lags * len(self.order) + 1 or len(df_var) <= check_lags:
-            msg = f"Insufficient observations ({len(df_var)}) for requested lags ({check_lags})."
+        n_effective = len(df_var) - check_lags
+        min_required = check_lags * len(self.order) + 1
+        if len(df_var) <= check_lags or n_effective < min_required:
+            msg = (
+                f"Insufficient observations ({len(df_var)}) for requested lags ({check_lags}). "
+                f"Effective sample size after lags ({n_effective}) is below min ({min_required})."
+            )
             raise ValueError(msg)
 
         model = VAR(df_var)
@@ -113,8 +128,9 @@ class VectorAutoregression:
         df_irf = pd.DataFrame(irf_rows)
 
         # Table 2: fevd (horizon, response, shock, value)
-        fevd_obj = results.fevd(self.horizon)
-        decomp = fevd_obj.decomp  # shape (k_vars, horizon_steps, k_vars)
+        # Fetch horizon + 1 steps to include step 0 through step self.horizon
+        fevd_obj = results.fevd(self.horizon + 1)
+        decomp = fevd_obj.decomp  # shape (k_vars, horizon + 1, k_vars)
         fevd_rows = []
         for r_idx, response in enumerate(results.names):
             for h in range(decomp.shape[1]):
