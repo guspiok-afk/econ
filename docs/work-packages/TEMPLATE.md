@@ -22,7 +22,8 @@ YAML keys. Copy from `docs/CONTRACT.md` where applicable; do not paraphrase.
 ```python
 # example
 class SidraSource(Source):
-    def fetch(self, spec: SeriesSpec, since: date | None) -> pd.DataFrame: ...
+    def fetch_raw(self, spec: SeriesSpec, since: date | None) -> RawResponse: ...
+    def parse(self, raw: RawResponse, spec: SeriesSpec) -> pd.DataFrame: ...
 ```
 
 Output shape (columns, dtypes, conventions that apply, e.g. `period` = period start).

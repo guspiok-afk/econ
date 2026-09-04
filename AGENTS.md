@@ -25,14 +25,15 @@ before touching the area it covers.
    depend on it.
 2. **Data lives outside the repository and outside any synced folder** (OneDrive, Google
    Drive): `ECONBASE_DATA_DIR`, default `%LOCALAPPDATA%\econbase\data`, sub-dirs `raw/`
-   (gzipped HTTP bodies + `raw_index`), `lake/` (Parquet + `manifest.json`), `db/`.
+   (gzipped HTTP bodies), `lake/` (Parquet tables incl. `raw_index` + `manifest.json`), `db/`.
    Nothing under `data/`, no `.parquet`, no `.duckdb`, no `.env` is ever committed.
 3. **Vintages are bitemporal, ALFRED style.** `observations(series_id, period, value,
    realtime_start, realtime_end, observed_at, run_id)`; logical key
    `(series_id, period, realtime_start)`; `realtime_end IS NULL` means "currently valid".
    A changed value closes the open row and inserts a new one. Never store one snapshot per
-   run, never overwrite history. FRED rows copy the real-time interval returned by the API
-   verbatim.
+   run, never overwrite history. Vintaged sources copy the interval the API returns, except
+   that an open-ended sentinel (`9999-12-31`) is stored as NULL. The pipeline validates every
+   result: unique key, one open row per period, no empty or overlapping intervals.
 4. **Identifiers are immutable.** `series_id = "{source}:{native_id}"` (`bcb_sgs:433`,
    `fred:CPIAUCSL`, `sidra:1737/2266`, `derived:sticky_cpi_br`). Renaming is forbidden;
    add an alias instead. `entity_id` is ISO 3166-1 alpha-2 for countries. `concept_id` is
@@ -95,15 +96,17 @@ comment on the issue instead of editing it.
 
 - Python `>=3.13`, developed on 3.14. Environment and locking with `uv` only
   (`uv sync --frozen`, `uv run ...`). Never `pip install` into the project.
-- Pins are deliberate: `duckdb>=1.5,<2`, `pandas>=2.3,<4`, `pyarrow>=25`. Do not bump.
+- Pins are deliberate: `duckdb>=1.5,<2`, `pandas>=2.3,<4`, `pyarrow>=21`. Do not bump.
 - Lint/format: `ruff` (config in `pyproject.toml`). Types: annotate public functions.
 - Tests: `pytest`. No network in tests: connectors are tested against recorded HTTP
   responses (`respx`) stored under `tests/fixtures/`. Store tests use a temp
   `ECONBASE_DATA_DIR`.
 - `Store` and `api` return `pyarrow.Table` by default; convert to pandas at the edge.
-- Connectors implement `Source.fetch(spec, since) -> long DataFrame` and go through the
-  shared HTTP helper (`sources/http.py`: httpx, tenacity retries, per-source minimum
-  interval, window chunking). No connector owns its own retry loop.
+- Connectors implement `Source.fetch_raw(spec, since) -> RawResponse` (the bytes, unparsed)
+  and `Source.parse(raw, spec) -> long DataFrame`. The pipeline archives the raw response
+  before parsing, so never parse inside `fetch_raw`. Requests go through the shared HTTP
+  helper (`sources/http.py`: httpx, tenacity retries, per-source minimum interval, window
+  chunking); no connector owns its own retry loop.
 - CLI subcommands (`update`, `check`, `rebuild-db`, `gc`, `list`, `search`) are idempotent
   and return non-zero exit codes on failure.
 - Commits: Conventional Commits (`feat(sources): add SIDRA connector`), scoped by package or

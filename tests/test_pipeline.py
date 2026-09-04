@@ -8,7 +8,7 @@ from tests.conftest import frame, vframe
 
 from econbase import pipeline, schemas
 from econbase.catalog import Catalog
-from econbase.sources.base import FetchResult, Source, StaticSource
+from econbase.sources.base import RawResponse, Source, StaticSource
 from econbase.store import Store
 
 T1 = dt.datetime(2026, 9, 1, 12, 0, tzinfo=dt.UTC)
@@ -167,8 +167,11 @@ class VintagedSource(Source):
         super().__init__()
         self.frames = frames
 
-    def fetch(self, spec, since=None) -> FetchResult:
-        return FetchResult(frame=self.frames[spec.series_id].copy(), raw_body=b"{}", url="v://x")
+    def fetch_raw(self, spec, since=None) -> RawResponse:
+        return RawResponse(body=b"{}", url="v://x")
+
+    def parse(self, raw: RawResponse, spec) -> pd.DataFrame:
+        return self.frames[spec.series_id].copy()
 
 
 def test_vintaged_source_upserts_intervals(store: Store, catalog: Catalog) -> None:
@@ -241,7 +244,7 @@ def test_fetch_exception_is_isolated_to_the_series(
     del static_source.frames["static:selic"]  # StaticSource raises KeyError
     s = run(store, catalog, static_source, T1)
     errs = {o.series_id: o.error for o in s.outcomes if o.error}
-    assert set(errs) == {"static:selic"} and "KeyError" in errs["static:selic"]
+    assert set(errs) == {"static:selic"} and "SourceError" in errs["static:selic"]
     assert s.status == "partial"
     assert store.observations().num_rows == 4
 

@@ -6,6 +6,7 @@ scripts can chain them.
 
 from __future__ import annotations
 
+import enum
 import subprocess
 from pathlib import Path
 from typing import Annotated
@@ -16,6 +17,15 @@ from econbase import __version__
 from econbase.catalog import Catalog, CatalogError
 from econbase.settings import Settings, get_settings
 from econbase.store import Store, StoreError
+
+
+class Trigger(enum.StrEnum):
+    """What started a run; persisted in ``runs.trigger`` (contract enum)."""
+
+    manual = "manual"
+    scheduler = "scheduler"
+    ci = "ci"
+
 
 app = typer.Typer(
     help="Open-data economic database with real-time vintages.",
@@ -131,7 +141,7 @@ def update(
     catalog: CatalogOpt = Path("catalog"),
     source: Annotated[list[str] | None, typer.Option(help="Only these sources.")] = None,
     series: Annotated[list[str] | None, typer.Option(help="Only these series ids.")] = None,
-    trigger: Annotated[str, typer.Option(help="manual | scheduler | ci")] = "manual",
+    trigger: Annotated[Trigger, typer.Option(help="What started this run.")] = Trigger.manual,
 ) -> None:
     """Fetch every selected series, archive raw bodies, apply bitemporal diffs, commit one run."""
     from econbase import pipeline
@@ -148,7 +158,7 @@ def update(
         series_ids=series or None,
         source_names=source or None,
         tz=settings.econbase_tz,
-        trigger=trigger,
+        trigger=trigger.value,
         package_version=__version__,
         git_sha=_git_sha(),
     )
@@ -160,6 +170,11 @@ def update(
         f"run {summary.run_id} ({summary.status}): "
         f"{len(summary.outcomes)} series, {summary.n_errors} error(s)"
     )
+    # the views name concrete Parquet files, so the cache is stale the moment a run commits
+    try:
+        store.rebuild_db()
+    except StoreError as exc:
+        typer.secho(f"query cache not refreshed: {exc}", err=True, fg=typer.colors.YELLOW)
     if summary.n_errors:
         raise typer.Exit(code=1)
 

@@ -8,7 +8,7 @@ import pandas as pd
 
 from econbase import pipeline, schemas
 from econbase.catalog import Catalog
-from econbase.sources.base import FetchResult, Source
+from econbase.sources.base import RawResponse, Source
 from econbase.store import Store
 
 T1 = dt.datetime(2026, 9, 1, 12, 0, tzinfo=dt.UTC)
@@ -20,18 +20,19 @@ class LeakySource(Source):
 
     name = "static"
 
-    def fetch(self, spec, since=None) -> FetchResult:
+    def fetch_raw(self, spec, since=None) -> RawResponse:
         if spec.native_id == "selic":
             raise RuntimeError(
                 f"HTTP 500 for https://x/api?series=selic&api_key={KEY}&file_type=json"
             )
-        frame = pd.DataFrame({"period": [dt.date(2026, 1, 1)], "value": [1.0]})
-        return FetchResult(
-            frame=frame,
-            raw_body=b"{}",
-            raw_ext="js/../on",
+        return RawResponse(
+            body=b"{}",
+            ext="js/../on",
             url=f"https://api.stlouisfed.org/fred/series/observations?series_id=X&api_key={KEY}",
         )
+
+    def parse(self, raw: RawResponse, spec) -> pd.DataFrame:
+        return pd.DataFrame({"period": [dt.date(2026, 1, 1)], "value": [1.0]})
 
 
 def test_redact_masks_credential_parameters() -> None:
