@@ -20,6 +20,34 @@ DEFAULT_TZ = "America/Sao_Paulo"
 REPO_ENV = Path(__file__).resolve().parents[2] / ".env"
 
 
+def _main_worktree_env(repo_root: Path) -> Path | None:
+    """``.env`` of the main working tree, when this checkout is a git worktree.
+
+    Agents work in their own worktrees so they never disturb each other's checkout, but ``.env``
+    is deliberately untracked and therefore exists only in the main tree. Without this the FRED
+    key is invisible from every worktree, and the failure reads as a missing key rather than as
+    a missing file.
+    """
+    marker = repo_root / ".git"
+    if not marker.is_file():
+        return None
+    try:
+        line = marker.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if not line.startswith("gitdir:"):
+        return None
+    gitdir = Path(line.split(":", 1)[1].strip())
+    # .../<main tree>/.git/worktrees/<name>  ->  <main tree>
+    for parent in gitdir.parents:
+        if parent.name == ".git":
+            return parent.parent / ".env"
+    return None
+
+
+MAIN_TREE_ENV = _main_worktree_env(REPO_ENV.parent)
+
+
 def default_data_dir() -> Path:
     """Per-user data directory outside the repository and outside synced folders."""
     if sys.platform == "win32":
@@ -35,7 +63,8 @@ class Settings(BaseSettings):
     """Settings read from the environment (case-insensitive) and from ``.env``."""
 
     model_config = SettingsConfigDict(
-        env_file=(".env", REPO_ENV),
+        # later files win, so the local .env still overrides the shared one
+        env_file=tuple(p for p in (MAIN_TREE_ENV, REPO_ENV, Path(".env")) if p is not None),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,

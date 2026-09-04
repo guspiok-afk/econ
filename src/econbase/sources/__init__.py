@@ -27,6 +27,8 @@ CONNECTOR_MODULES: tuple[str, ...] = (
     "econbase.sources.fred",
     "econbase.sources.bcb_sgs",
     "econbase.sources.bcb_focus",
+    "econbase.sources.sidra",
+    "econbase.sources.ipeadata",
 )
 
 
