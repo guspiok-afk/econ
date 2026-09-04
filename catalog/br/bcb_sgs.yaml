@@ -1,0 +1,102 @@
+# Banco Central do Brasil — SGS (Sistema Gerenciador de Séries Temporais).
+source: bcb_sgs
+defaults:
+  entity_id: BR
+  license: BCB open data
+  redistributable: true
+  domain: macro
+series:
+  - native_id: '433'
+    concept_id: cpi_headline
+    title: IPCA monthly change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=433
+
+  - native_id: '13522'
+    title: IPCA 12-month accumulated change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=13522
+
+  - native_id: '432'
+    concept_id: policy_rate
+    title: Selic target rate
+    unit: pct_pa
+    freq: D
+    expected_lag_days: 1
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=432
+
+  - native_id: '11'
+    concept_id: interbank_rate
+    title: Selic effective rate (overnight)
+    unit: pct_pa
+    freq: D
+    expected_lag_days: 1
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=11
+
+  - native_id: '24363'
+    concept_id: activity_index
+    title: IBC-Br economic activity index
+    unit: index
+    freq: M
+    expected_lag_days: 50
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=24363
+
+  - native_id: '1'
+    concept_id: fx_spot_usd
+    title: PTAX selling rate (USD/BRL)
+    unit: BRL
+    freq: D
+    expected_lag_days: 1
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=1
+
+  - native_id: '7806'
+    concept_id: swap_1y
+    title: Swap DI-Pré 360 days interest rate
+    unit: pct_pa
+    freq: D
+    expected_lag_days: 1
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=7806
+
+  - native_id: '20539'
+    concept_id: credit_outstanding
+    title: Total credit outstanding to private sector
+    unit: millions BRL
+    freq: M
+    expected_lag_days: 30
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=20539
+
+  - native_id: '20714'
+    concept_id: credit_rate
+    title: Average lending rate
+    unit: pct_pa
+    freq: M
+    expected_lag_days: 30
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=20714
+
+  - native_id: '21082'
+    concept_id: credit_delinquency
+    title: Non-performing loans ratio
+    unit: pct
+    freq: M
+    expected_lag_days: 30
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=21082
+
+  - native_id: '4649'
+    concept_id: primary_balance
+    title: Public sector primary balance, 12m % GDP
+    unit: pct_gdp
+    freq: M
+    expected_lag_days: 30
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=4649
+
+  - native_id: '13762'
+    concept_id: gross_debt
+    title: General government gross debt, % GDP
+    unit: pct_gdp
+    freq: M
+    expected_lag_days: 30
+    source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=13762

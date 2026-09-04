@@ -12,8 +12,9 @@ import datetime as dt
 import logging
 import ssl
 import time
-from collections.abc import Mapping
+from collections.abc import Container, Mapping
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from tenacity import (
@@ -135,8 +136,14 @@ class Client:
         *,
         source: str,
         headers: Mapping[str, str] | None = None,
+        allow_status: Container[int] | None = None,
     ) -> httpx.Response:
-        """GET with pacing and bounded retries. Raises :class:`SourceError` on failure."""
+        """GET with pacing and bounded retries. Raises :class:`SourceError` on failure.
+
+        ``allow_status`` lists error statuses the caller wants to inspect itself instead of
+        having them raised — the BCB answers a window with no observations with a 404, which is
+        an ordinary outcome when sweeping a long history in windows, not a failure.
+        """
 
         def _attempt() -> httpx.Response:
             self._wait_turn(source)
@@ -169,7 +176,9 @@ class Client:
                 f"{source}: request failed after {MAX_ATTEMPTS} attempts: {exc}"
             ) from exc
 
-        if response.status_code >= 400:
+        if response.status_code >= 400 and not (
+            allow_status and response.status_code in allow_status
+        ):
             raise SourceError(
                 f"{source}: HTTP {response.status_code} for {_safe_url(response)}: "
                 f"{response.text[:200]}"
@@ -238,6 +247,26 @@ def _is_thousands(text: str, sep: str) -> bool:
     if len(parts) < 2 or not parts[0] or len(parts[0]) > 3:
         return False
     return all(len(part) == 3 and part.isdigit() for part in parts[1:]) and len(parts) > 2
+
+
+def odata_query(**params: object) -> str:
+    """Build an OData query string the BCB's Olinda gateway accepts.
+
+    ``httpx`` (like most clients) encodes a space as ``+``. Olinda rejects that with
+    ``The types 'Edm.Boolean' and 'Edm.String' are not compatible``, an error message that
+    points nowhere near the real cause. It wants ``%20``, and it accepts the single quotes of
+    an OData literal unencoded. Build the query here and pass the finished URL to
+    :meth:`Client.get`; never hand these parameters to ``params=``.
+
+    >>> odata_query(**{"$format": "json", "$filter": "Indicador eq 'IPCA'"})
+    "$format=json&$filter=Indicador%20eq%20'IPCA'"
+    """
+    parts = []
+    for key, value in params.items():
+        if value is None:
+            continue
+        parts.append(f"{key}={quote(str(value), safe="$,'()/:")}")
+    return "&".join(parts)
 
 
 def date_windows(start: dt.date, end: dt.date, *, years: int = 10) -> list[tuple[dt.date, dt.date]]:
