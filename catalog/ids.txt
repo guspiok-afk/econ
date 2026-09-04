@@ -54,3 +54,6 @@ fred:GDPNOW
 fred:TOTCI
 fred:DRCCLACBS
 fred:DTWEXBGS
+dbnomics:BCB/bop/S1-A
+dbnomics:BCB/bop/S1-Q
+file_http:nyfed_gscpi

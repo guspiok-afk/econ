@@ -1,0 +1,16 @@
+# DBnomics republishes 93 statistical providers under one API. This is the route a new country
+# takes into the catalog without a line of new code; the direct connectors stay for the sources
+# whose coverage here is partial (the BCB has one dataset).
+source: dbnomics
+defaults:
+  entity_id: BR
+  license: DBnomics redistribution of the provider's own terms
+  redistributable: false
+  domain: macro
+series:
+  - native_id: BCB/bop/S1-A
+    title: Brazil current account, annual
+    freq: A
+  - native_id: BCB/bop/S1-Q
+    title: Brazil current account, quarterly
+    freq: Q
