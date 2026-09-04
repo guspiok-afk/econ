@@ -112,6 +112,8 @@ dev = [
     { name = "pytest" },
     { name = "respx" },
     { name = "ruff" },
+    { name = "scipy" },
+    { name = "statsmodels" },
 ]
 
 [package.metadata]
@@ -139,6 +141,8 @@ dev = [
     { name = "pytest", specifier = ">=8.3" },
     { name = "respx", specifier = ">=0.22" },
     { name = "ruff", specifier = ">=0.8" },
+    { name = "scipy", specifier = ">=1.14" },
+    { name = "statsmodels", specifier = ">=0.15" },
 ]
 
 [[package]]
