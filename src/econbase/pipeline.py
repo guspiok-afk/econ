@@ -42,6 +42,8 @@ VALUE_ATOL = 1e-12
 #: of the open periods) before the pipeline refuses, to survive truncated API responses.
 MAX_VANISH_ABS = 10
 MAX_VANISH_FRACTION = 0.5
+#: Below this many periods, a response with no usable value is ordinary rather than suspicious.
+MIN_ROWS_FOR_ALL_MISSING = 12
 #: Sources use a far-future date to mean "still current" (FRED: 9999-12-31). Stored as NULL.
 OPEN_END_SENTINEL = dt.date(9999, 12, 31)
 
@@ -510,6 +512,26 @@ def _archive_raw(
     return row, sha
 
 
+def _all_values_missing(frame: pd.DataFrame) -> bool:
+    """True when a long response carries periods but not one usable number.
+
+    Sources answer this way when a request is under-specified rather than wrong: SIDRA returns
+    a full-length series of ``..`` when a table's classification is omitted, which arrives as
+    hundreds of rows and no data. Stored, it would look like a healthy series forever.
+
+    A short all-missing response is ordinary — the newest month may not be out yet, and a first
+    release is sometimes published empty — so the guard only speaks above
+    :data:`MIN_ROWS_FOR_ALL_MISSING`, and only for values that are missing rather than
+    unparseable: a value the connector failed to parse must raise its own, more precise error.
+    """
+    if len(frame) < MIN_ROWS_FOR_ALL_MISSING:
+        return False
+    values = frame["value"]
+    if not pd.api.types.is_numeric_dtype(values) and values.notna().any():
+        return False  # strings present: let the numeric parser report what is wrong with them
+    return bool(pd.to_numeric(values, errors="coerce").isna().all())
+
+
 def _series_stats(part: pd.DataFrame) -> dict[str, tuple[dt.date, dt.date]]:
     if part.empty:
         return {}
@@ -633,6 +655,13 @@ def update(
                     frame = source.parse(raw, spec)
                     if frame is None or len(frame) == 0:
                         outcome.error = "empty response; no changes applied"
+                    elif _all_values_missing(frame):
+                        # a full-length series of nulls is a misconfigured request, not data:
+                        # SIDRA answers this way when a table's classification is left out
+                        outcome.error = (
+                            f"{len(frame)} periods returned and every value is missing; "
+                            "refusing to store an empty series (under-specified request?)"
+                        )
                     else:
                         vintaged = "realtime_start" in frame.columns
                         if vintaged:

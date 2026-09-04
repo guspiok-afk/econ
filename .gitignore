@@ -25,6 +25,9 @@ htmlcov/
 .ipynb_checkpoints/
 notebooks/**/outputs/
 
+# gerado a cada sessao pelo agent-kit; project.yaml e versionado, state.json nao
+.pma/state.json
+
 # IDE / OS
 .vscode/
 .idea/

@@ -34,3 +34,274 @@ series:
     # ~5100 vintage dates: past FRED's 2000-vintage ceiling, so the store keeps pseudo
     # real-time intervals from the collection date instead (see docs/adr/0002)
     params: {vintages: false}
+
+  - native_id: CPIAUCSL
+    concept_id: cpi_headline_index
+    title: "Consumer Price Index for All Urban Consumers: All Items"
+    unit: index 1982-1984=100
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 12
+    source_url: https://fred.stlouisfed.org/series/CPIAUCSL
+    params: {vintages: true}
+
+  - native_id: CPILFESL
+    title: "Consumer Price Index for All Urban Consumers: All Items Less Food and Energy"
+    unit: index 1982-1984=100
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 12
+    source_url: https://fred.stlouisfed.org/series/CPILFESL
+    params: {vintages: true}
+
+  - native_id: PCEPI
+    title: Personal Consumption Expenditures Price Index
+    unit: index 2017=100
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 28
+    source_url: https://fred.stlouisfed.org/series/PCEPI
+    params: {vintages: true}
+
+  - native_id: PCEPILFE
+    title: Personal Consumption Expenditures Price Index Less Food and Energy
+    unit: index 2017=100
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 28
+    source_url: https://fred.stlouisfed.org/series/PCEPILFE
+    params: {vintages: true}
+
+  - native_id: CORESTICKM159SFRBATL
+    concept_id: cpi_sticky
+    title: Core CPI Stickiness Index
+    unit: percent change from year ago
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 12
+    source_url: https://fred.stlouisfed.org/series/CORESTICKM159SFRBATL
+    params: {vintages: true}
+
+  - native_id: COREFLEXCPIM159SFRBATL
+    concept_id: cpi_flexible
+    title: Core CPI Flexibility Index
+    unit: percent change from year ago
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 12
+    source_url: https://fred.stlouisfed.org/series/COREFLEXCPIM159SFRBATL
+    params: {vintages: true}
+
+  - native_id: UNRATE
+    concept_id: unemployment_rate
+    title: Unemployment Rate
+    unit: percent
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 5
+    source_url: https://fred.stlouisfed.org/series/UNRATE
+    params: {vintages: true}
+
+  - native_id: PAYEMS
+    concept_id: employment
+    title: Non-Farm Payroll Employment
+    unit: thousands of persons
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 5
+    source_url: https://fred.stlouisfed.org/series/PAYEMS
+    params: {vintages: true}
+
+  - native_id: CIVPART
+    title: Civilian Labor Force Participation Rate
+    unit: percent
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 5
+    source_url: https://fred.stlouisfed.org/series/CIVPART
+    params: {vintages: true}
+
+  - native_id: ICSA
+    concept_id: initial_claims
+    title: Initial Claims
+    unit: number
+    freq: W
+    seasonal_adj: true
+    expected_lag_days: 5
+    source_url: https://fred.stlouisfed.org/series/ICSA
+    params: {vintages: true}
+
+  - native_id: JTSJOL
+    title: "Job Openings and Labor Turnover: Job Openings"
+    unit: thousands
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 38
+    source_url: https://fred.stlouisfed.org/series/JTSJOL
+    params: {vintages: true}
+
+  - native_id: AHETPI
+    concept_id: wages
+    title: Average Hourly Earnings of All Employees
+    unit: dollars per hour
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 5
+    source_url: https://fred.stlouisfed.org/series/AHETPI
+    params: {vintages: true}
+
+  - native_id: FRBKCLMCILA
+    concept_id: labor_conditions_index
+    title: Labor Conditions Index (St. Louis Fed)
+    unit: index
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 12
+    source_url: https://fred.stlouisfed.org/series/FRBKCLMCILA
+    params: {vintages: true}
+
+  - native_id: FRBKCLMCIM
+    title: Labor Conditions Index (St. Louis Fed)
+    unit: index
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 12
+    source_url: https://fred.stlouisfed.org/series/FRBKCLMCIM
+    params: {vintages: true}
+
+  - native_id: FEDFUNDS
+    concept_id: policy_rate
+    title: Effective Federal Funds Rate
+    unit: percent per year
+    freq: M
+    seasonal_adj: false
+    expected_lag_days: 3
+    source_url: https://fred.stlouisfed.org/series/FEDFUNDS
+    params: {vintages: true}
+
+  - native_id: SOFR
+    concept_id: interbank_rate
+    title: Secured Overnight Financing Rate
+    unit: percent per year
+    freq: D
+    seasonal_adj: false
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/SOFR
+    params: {vintages: true}
+
+  - native_id: DGS2
+    concept_id: govt_yield_2y
+    title: Market Yield on U.S. Treasury Securities at 2-Year Constant Maturity
+    unit: percent per year
+    freq: B
+    calendar: SIFMA
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/DGS2
+    params: {vintages: false}
+
+  - native_id: T10Y2Y
+    title: 10-Year Treasury Constant Maturity Minus 2-Year Treasury Constant Maturity
+    unit: percent per year
+    freq: B
+    calendar: SIFMA
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/T10Y2Y
+    params: {vintages: false}
+
+  - native_id: T5YIE
+    title: 5-Year Treasury Constant Maturity Minus 5-Year Breakeven Inflation Rate
+    unit: percent per year
+    freq: B
+    calendar: SIFMA
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/T5YIE
+    params: {vintages: false}
+
+  - native_id: INDPRO
+    concept_id: industrial_production
+    title: Industrial Production Index
+    unit: index 2017=100
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 16
+    source_url: https://fred.stlouisfed.org/series/INDPRO
+    params: {vintages: true}
+
+  - native_id: TCU
+    concept_id: capacity_utilization
+    title: "Capacity Utilization: Total Industry"
+    unit: percent
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 16
+    source_url: https://fred.stlouisfed.org/series/TCU
+    params: {vintages: true}
+
+  - native_id: RSXFS
+    concept_id: retail_sales
+    title: "Retail Sales: Total Sales"
+    unit: millions of dollars
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 16
+    source_url: https://fred.stlouisfed.org/series/RSXFS
+    params: {vintages: true}
+
+  - native_id: HOUST
+    title: Housing Starts
+    unit: thousands of units, annual rate
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 18
+    source_url: https://fred.stlouisfed.org/series/HOUST
+    params: {vintages: true}
+
+  - native_id: UMCSENT
+    concept_id: consumer_confidence
+    title: "University of Michigan: Consumer Sentiment"
+    unit: index 1966Q1=100
+    freq: M
+    seasonal_adj: false
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/UMCSENT
+    params: {vintages: true}
+
+  - native_id: GDPNOW
+    concept_id: gdp_nowcast
+    title: GDP Nowcast
+    unit: percent change at annual rate
+    freq: Q
+    seasonal_adj: true
+    expected_lag_days: 0
+    source_url: https://fred.stlouisfed.org/series/GDPNOW
+    params: {vintages: true}
+
+  - native_id: TOTCI
+    concept_id: credit_outstanding
+    title: Total Credit Outstanding
+    unit: billions of dollars
+    freq: W
+    seasonal_adj: true
+    expected_lag_days: 8
+    source_url: https://fred.stlouisfed.org/series/TOTCI
+    params: {vintages: true}
+
+  - native_id: DRCCLACBS
+    concept_id: credit_delinquency
+    title: Delinquency Rate on Commercial and Industrial Loans
+    unit: percent
+    freq: Q
+    seasonal_adj: true
+    expected_lag_days: 60
+    source_url: https://fred.stlouisfed.org/series/DRCCLACBS
+    params: {vintages: true}
+
+  - native_id: DTWEXBGS
+    concept_id: fx_effective_index
+    title: U.S. Dollar Index, Based on Trade-Weighted Exchanges
+    unit: index Jan 2006=100
+    freq: D
+    seasonal_adj: false
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/DTWEXBGS
+    params: {vintages: true}

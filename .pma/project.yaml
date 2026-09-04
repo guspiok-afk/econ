@@ -1,0 +1,73 @@
+schema: pma/1
+
+project:
+  id: econ
+  name: Base econômica e camada de análises
+  repo: guspiok-afk/econ
+  root: C:\dev\econ
+  status: active
+  priority: 1
+  summary: >
+    Base de séries econômicas de dados abertos, com histórico de revisões desde o primeiro dia,
+    e a camada de análises macro que roda sobre ela. Brasil e Estados Unidos hoje; adicionar um
+    país é uma mudança de catálogo, não de código.
+
+goal: >
+  Uma base que responda "o que se sabia nesta data" para qualquer série, atualizada sozinha, e
+  sobre a qual rodem Curva de Phillips, Regra de Taylor, paridade cambial, VAR e SVAR,
+  nowcasting por fatores dinâmicos, índices ao estilo dos Feds regionais, e um DSGE.
+
+phases:
+  - {id: "01", title: "Fundação: contrato, armazenamento, pipeline bitemporal", state: done}
+  - {id: "02", title: "Conectores e catálogo", state: done}
+  - {id: "03", title: "Transformações, API e automação", state: active}
+  - {id: "04", title: "Análises tier 1", state: todo}
+  - {id: "05", title: "Nowcasting e índices", state: todo}
+  - {id: "06", title: "DSGE", state: todo}
+  - {id: "07", title: "Preços de ativos (projeto irmão, mesmo repositório)", state: todo}
+
+decisions:
+  - question: Adotar Julia para o módulo DSGE?
+    answer: >
+      Não. Custaria de 75 a 155 horas fixas mais manutenção, e só beneficiaria o DSGE; Python
+      resolve o modelo de três equações.
+    reopen_when: >
+      Perturbação de segunda ou terceira ordem com estimação por gradiente, restrição de piso de
+      juros, ou necessidade de biblioteca pronta de modelos médios.
+
+  - question: Um repositório ou dois?
+    answer: Um, com dois pacotes independentes; o projeto de ativos entra aqui mesmo.
+    reopen_when: Um repositório irmão precisar fixar versão, ou entrar um segundo colaborador.
+
+  - question: Quem escreve os dados?
+    answer: Só o agendador local. A integração contínua roda testes e nunca grava dados.
+    reopen_when: Surgir um leitor remoto ou um aplicativo hospedado.
+
+  - question: Guardar histórico de revisões desde o início?
+    answer: >
+      Sim. Já provou o valor: o desemprego americano de abril de 2020 foi publicado em 14,7% e
+      hoje lê 14,8%.
+    reopen_when: nunca
+
+executors:
+  - {name: "agent:claude", validated: true, notes: "arquiteto e integrador"}
+  - {name: "agent:jules", validated: true, notes: "WP-02b, conectores do Banco Central"}
+  - {name: "agent:antigravity", validated: true, notes: "WP-02c e WP-02d"}
+  - {name: "agent:ollama", validated: true, notes: "WP-02e; acerta conteúdo, erra formato"}
+
+interfaces:
+  - kind: parquet
+    path: "%LOCALAPPDATA%\econbase\data\lake"
+    stability: stable
+    note: fonte da verdade; o arquivo DuckDB é cache reconstruível
+  - kind: python
+    path: "econbase.api"
+    stability: stable
+    note: get e get_panel por conceito, com corte por data de conhecimento
+
+commands:
+  test: uv run pytest -q
+  lint: uv run ruff check . ; uv run ruff format --check .
+  update: uv run python -m econbase.cli update
+  check: uv run python -m econbase.cli check
+  refresh_state: powershell -File C:\dev\agent-kit\scripts\pma-state.ps1

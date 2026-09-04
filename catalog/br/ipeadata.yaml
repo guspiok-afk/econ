@@ -1,0 +1,11 @@
+source: ipeadata
+defaults:
+  entity_id: BR
+  license: IPEA open data
+  redistributable: true
+series:
+  - native_id: BM12_TJOVER12
+    title: Selic accumulated in the month (% p.m.)
+    unit: pct
+    freq: M
+    expected_lag_days: 5

@@ -1,0 +1,56 @@
+source: sidra
+defaults:
+  entity_id: BR
+  license: IBGE open data
+  redistributable: true
+series:
+  - native_id: 1737/63
+    title: IPCA monthly change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+  - native_id: 1737/2266
+    concept_id: cpi_headline_index
+    title: IPCA index (base Dec 1993 = 100)
+    unit: index
+    freq: M
+    expected_lag_days: 12
+  - native_id: 1620/583
+    concept_id: gdp_real
+    title: GDP volume index, chained (base average 1995 = 100)
+    unit: index
+    freq: Q
+    seasonal_adj: true
+    expected_lag_days: 60
+    params: {classifications: c11255/90707}
+  - native_id: 6381/4099
+    concept_id: unemployment_rate
+    title: Unemployment rate, moving quarter ending in the reference month
+    unit: pct
+    freq: M
+    expected_lag_days: 45
+  # Every one of these three tables mixes cuts under a classification. Ask without one and
+  # SIDRA answers with a full-length series of "..", which looks like data and is not.
+  - native_id: 8888/12606
+    concept_id: industrial_production
+    title: Industrial production index, general industry (PIM-PF, 2022 = 100)
+    unit: index
+    freq: M
+    expected_lag_days: 45
+    # c544 is "Seções e atividades industriais"; 129314 is general industry
+    params: {classifications: c544/129314}
+  - native_id: 8880/7169
+    concept_id: retail_sales
+    title: Retail sales volume index (PMC, 2022 = 100)
+    unit: index
+    freq: M
+    expected_lag_days: 45
+    # c11046 separates nominal revenue from volume; 56734 is the volume of sales
+    params: {classifications: c11046/56734}
+  - native_id: 5906/7167
+    title: Services volume index (PMS, 2022 = 100)
+    unit: index
+    freq: M
+    expected_lag_days: 45
+    # 56726 is the volume of services, as against 56725 for nominal revenue
+    params: {classifications: c11046/56726}

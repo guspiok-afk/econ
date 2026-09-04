@@ -78,3 +78,35 @@ def test_missing_values_are_stored_as_nan_and_compared_as_equal(
     assert (o.rows_new, o.rows_revised, o.rows_closed) == (0, 0, 0)
     obs = schemas.to_pandas(store.observations(["static:ipca"]))
     assert len(obs) == 2 and obs["value"].isna().sum() == 1
+
+
+def test_a_series_of_only_missing_values_is_refused(store: Store, catalog: Catalog) -> None:
+    """SIDRA answers a table's missing classification with a full-length series of "..".
+
+    Hundreds of rows arrive and not one carries a number. Stored, it would look like a healthy
+    series forever; the run must call it what it is instead.
+    """
+    empty_values = pd.DataFrame(
+        {
+            "period": [d.date() for d in pd.date_range("2024-01-01", periods=24, freq="MS")],
+            "value": [float("nan")] * 24,
+        }
+    )
+    src = StaticSource({"static:ipca": empty_values})
+    s = _run(store, catalog, src, T1)
+    err = s.outcomes[0].error
+    assert err and "every value is missing" in err
+    assert store.observations(["static:ipca"]).num_rows == 0
+
+
+def test_a_series_with_some_missing_values_is_stored(store: Store, catalog: Catalog) -> None:
+    """The guard must not reject a real series that merely has gaps."""
+    mixed = pd.DataFrame(
+        {
+            "period": [d.date() for d in pd.date_range("2024-01-01", periods=4, freq="MS")],
+            "value": [float("nan"), 1.0, float("nan"), 2.0],
+        }
+    )
+    s = _run(store, catalog, StaticSource({"static:ipca": mixed}), T1)
+    assert s.outcomes[0].error is None
+    assert store.observations(["static:ipca"]).num_rows == 4
