@@ -5,7 +5,7 @@ concepts:
   cpi_headline:
     description: Headline consumer price index, monthly percentage change
     unit_kind: pct
-    default_agg: sum
+    default_agg: compound
   cpi_headline_index:
     description: Headline consumer price index level
     unit_kind: index
@@ -13,7 +13,7 @@ concepts:
   cpi_core:
     description: Core consumer price index (ex food and energy or central bank core), monthly percentage change
     unit_kind: pct
-    default_agg: sum
+    default_agg: compound
   cpi_sticky:
     description: Sticky-price CPI, annualized monthly percentage change
     unit_kind: pct
@@ -43,9 +43,10 @@ concepts:
     unit_kind: pct_pa
     default_agg: eop
   gdp_real:
+    # The United States series is at an annual rate and Brazil's is an index; neither adds.
     description: Real GDP, seasonally adjusted, chained volume
     unit_kind: level
-    default_agg: sum
+    default_agg: mean
   gdp_nowcast:
     description: Official or replicated GDP nowcast, annualized quarterly growth
     unit_kind: pct
