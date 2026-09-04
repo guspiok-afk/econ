@@ -8,6 +8,12 @@ Convenções deste manual: comandos em blocos são para o **PowerShell** do Wind
 indicação. Caminhos fixos: repositório em `C:\dev\econ`; dados em
 `%LOCALAPPDATA%\econbase\data` (nunca no OneDrive ou no Google Drive).
 
+**Uma pasta por agente.** `C:\dev\econ` guarda a `main` e é a pasta de referência; cada agente
+em trabalho recebe uma árvore própria (`C:\dev\econ-<nome>`), criada com
+`C:\devgent-kit\scripts
+ew-worktree.ps1`. Nunca troque a branch de uma pasta que outro
+agente está usando: o checkout apaga do disco os arquivos dele no meio da tarefa.
+
 **Duas metades.** As seções 4, 5, 6 e 9.1 (Ollama, Antigravity, Jules e o ciclo de um pacote
 de trabalho) valem para qualquer projeto seu e vão migrar para o kit de operação de agentes
 quando ele existir. As demais são específicas do `econ`: chave do FRED, pasta de dados,
@@ -135,7 +141,7 @@ Se quiser outro local (por exemplo um disco maior), defina no `.env`:
 ECONBASE_DATA_DIR=D:\econbase\data
 ```
 
-Após o WP-01, `uv run econbase init` cria a estrutura (`raw/`, `lake/`, `db/`) e imprime o
+Após o WP-01, `uv run python -m econbase.cli init` cria a estrutura (`raw/`, `lake/`, `db/`) e imprime o
 caminho em uso.
 
 ---
@@ -246,19 +252,27 @@ schtasks /Create /TN "econbase-backup" /SC DAILY /ST 23:30 /F /TR "powershell.ex
 
 Teste imediato: `schtasks /Run /TN "econbase-backup"`. Depois faça **um** teste de restauração:
 copie a pasta do backup para um local temporário, aponte `ECONBASE_DATA_DIR` para ela e rode
-`uv run econbase rebuild-db`. Se as views abrem, o backup serve.
+`uv run python -m econbase.cli rebuild-db`. Se as views abrem, o backup serve.
 
-### 7.3 Tarefa agendada de atualização (após o WP-03 entregar `scripts/daily.ps1`)
+### 7.3 Tarefa agendada de atualização
+
+Pronta. `scripts/daily.ps1` coleta, reconstrói o cache de consultas, verifica o frescor e faz o
+backup, nessa ordem, e nenhuma etapa cancela a seguinte — uma fonte fora do ar não impede o
+backup das outras. Ele substitui a tarefa de backup isolada da seção 7.2.
 
 ```powershell
-schtasks /Create /TN "econbase-update-am" /SC DAILY /ST 09:15 /F /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dev\econ\scripts\daily.ps1"
-schtasks /Create /TN "econbase-update-pm" /SC DAILY /ST 18:45 /F /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dev\econ\scripts\daily.ps1"
+schtasks /Create /TN "econbase-manha" /SC DAILY /ST 09:15 /F /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dev\econ\scripts\daily.ps1 -Backup 'G:\Meu Drive\econbase-backup'"
+schtasks /Create /TN "econbase-tarde" /SC DAILY /ST 18:45 /F /TR "powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\dev\econ\scripts\daily.ps1 -Backup 'G:\Meu Drive\econbase-backup'"
 ```
 
-Horários pensados para depois das divulgações do IBGE (9h) e dos releases americanos (8h30 ET).
-O laptop precisa estar ligado; uma execução perdida aparece como ausência na tabela `runs`.
+Teste sem esperar o horário: `schtasks /Run /TN "econbase-manha"`.
 
----
+Horários pensados para caírem depois das divulgações: o IBGE publica de manhã e os dados
+americanos saem às 8h30 de Nova York. O laptop precisa estar ligado; uma execução perdida não
+deixa buraco, porque a seguinte pega o que faltou, mas aparece como ausência na tabela `runs`.
+
+**O detalhe da operação está em [`docs/OPERATION.md`](OPERATION.md):** onde olhar quando algo
+não vier, uma tabela de sintomas e causas, e o teste de restauração do backup.
 
 ## 8. Colab e NotebookLM (opcionais)
 
@@ -306,11 +320,11 @@ ao escrever pacotes de trabalho: documentação técnica do LMCI (Kansas City Fe
 cd C:\dev\econ
 uv sync --frozen --group dev          # ambiente
 uv run pytest -q                      # testes
-uv run econbase list                  # séries do catálogo
-uv run econbase check                 # frescor e lacunas (código de saída ≠ 0 se algo estiver parado)
-uv run econbase update                # atualiza tudo (após WP-02; normalmente via Task Scheduler)
-uv run econbase rebuild-db            # recria db\econbase.duckdb a partir do manifest
-uv run econbase gc --days 7           # remove arquivos Parquet órfãos antigos
+uv run python -m econbase.cli list                  # séries do catálogo
+uv run python -m econbase.cli check                 # frescor e lacunas (código de saída ≠ 0 se algo estiver parado)
+uv run python -m econbase.cli update                # atualiza tudo (normalmente pelo agendador)
+uv run python -m econbase.cli rebuild-db            # recria db\econbase.duckdb a partir do manifest
+uv run python -m econbase.cli gc --days 7           # remove arquivos Parquet órfãos antigos
 ```
 
 Consulta rápida aos dados, de qualquer ferramenta que fale DuckDB (Python, DBeaver, CLI):
@@ -334,7 +348,7 @@ Abra sempre em modo somente leitura. O escritor único é o `econbase update`.
 | Sintoma | O que fazer |
 |---|---|
 | `econbase check` reporta série parada | Veja a coluna `error` em `run_series` da última execução; se a fonte mudou, abra uma issue `agent:jules` ou `agent:claude` |
-| Erro de lock ao abrir o `.duckdb` | Feche notebooks/DBeaver; rode `uv run econbase rebuild-db` |
+| Erro de lock ao abrir o `.duckdb` | Feche notebooks/DBeaver; rode `uv run python -m econbase.cli rebuild-db` |
 | Arquivo Parquet corrompido ou apagado | Restaure a partir do backup (7.2) e rode `rebuild-db`; `raw/` permite reprocessar |
 | Suspeita de bug no diff de vintages | Não edite dados à mão; abra issue `agent:claude` com o `series_id`; o `raw/` é a prova |
 | Execução agendada não rodou | `schtasks /Query /TN econbase-update-am /V` e o log em `%LOCALAPPDATA%\econbase\logs` (WP-03) |
@@ -355,17 +369,18 @@ Abra sempre em modo somente leitura. O escritor único é o `econbase update`.
 
 ## 11. Marcos e decisões que ficam com você
 
-| Marco | O que você decide/valida |
-|---|---|
-| WP-01 (fundação) | Aprovar o contrato de dados (`docs/CONTRACT.md`) e a estrutura; merge do PR |
-| WP-02 (conectores) | Conferir o catálogo inicial (séries que interessam), licenças e flags de redistribuição |
-| WP-03 (transformações, CLI, automação) | Criar as tarefas agendadas (7.3); validar o `daily.ps1` |
-| WP-04+ (análises) | Validar resultados econômicos (Taylor vs Selic, Sticky-CPI vs FRED etc.) |
-| Terceiro país | Decidir a estratégia de mapeamento por país (templates DBnomics) |
-| Primeiro leitor remoto ou app | Decidir a publicação em object storage e a API |
-| Domínio de ativos | Aprovar as tabelas `prices_daily`/`corporate_actions` e as fontes abertas |
-
----
+| marco | estado | o que você decide |
+|---|---|---|
+| WP-01, fundação | pronto | contrato de dados aprovado |
+| WP-02, conectores e catálogo | pronto | 55 séries de 7 fontes, ~520 mil observações |
+| WP-03a, transformações e API | pronto | as análises pedem conceitos, não identificadores |
+| WP-03b, rotina diária | em revisão | **criar as tarefas agendadas** (seção 7.3) |
+| Fase 4, análises tier 1 | a fazer | validar contra referência: Taylor, Phillips, paridade |
+| Fase 5, nowcasting e índices | a fazer | validar o backtest com vintages |
+| Fase 6, DSGE | a fazer | validar contra o Dynare |
+| Terceiro país | a fazer | estratégia de mapeamento via DBnomics |
+| Primeiro leitor remoto ou app | a fazer | publicar em armazenamento de objetos, e a API |
+| Domínio de ativos | a fazer | aprovar as tabelas de preços e as fontes abertas |
 
 ## 12. Glossário
 
