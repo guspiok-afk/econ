@@ -98,3 +98,33 @@ uv run python -m econbase.cli update --series fred:GDPC1  # uma série
 
 O `--trigger` fica em `manual` por padrão, o que separa na tabela `runs` o que você fez do que
 o agendador fez.
+
+## Uma coisa que só aparece quando o Claude coleta
+
+O Claude Code roda dentro do aplicativo de desktop, que é empacotado pelo Windows. Dentro dele,
+`%LOCALAPPDATA%` não é `C:\Users\<você>\AppData\Local`, e sim
+
+```
+C:\Users\<você>\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local
+```
+
+Como `ECONBASE_DATA_DIR` está vazio no `.env`, a base cai no padrão `%LOCALAPPDATA%\econbase\data`
+— e isso resolve para **dois lugares diferentes** conforme quem executa. Uma coleta feita pelo
+Claude escreve numa cópia privada do contêiner; a tarefa agendada e o seu terminal escrevem na
+base de verdade. Nenhuma das duas vê a outra.
+
+Consequências práticas:
+
+- **Uma coleta que o Claude rodou não é prova de que a sua base foi atualizada.** Ela prova que o
+  conector funciona e que a fonte respondeu, que é o que os pacotes de trabalho pedem. O estado da
+  sua base se confere no seu terminal.
+- **A verificação vale no seu terminal**, sempre:
+
+  ```powershell
+  uv run python -m econbase.cli check
+  Get-ChildItem "$env:LOCALAPPDATA\econbase\data\lake\observations"
+  ```
+
+- Se quiser as duas apontando para o mesmo lugar, preencha `ECONBASE_DATA_DIR` no `.env` com um
+  caminho absoluto fora do OneDrive, por exemplo `C:\dados\econbase`. O `.env` do repositório
+  principal é lido também pelas árvores de trabalho, então basta escrever uma vez.
