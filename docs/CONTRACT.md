@@ -81,12 +81,31 @@ raw_sha256 (nullable), error (nullable), duration_ms (int64)`.
 path (relative to raw/), stored (bool; false when the body equalled the previous one and only
 the index row was kept)`.
 
+### model_runs
+`model_run_id, model_id, model_version, entity_id (nullable), asof (DATE), seed (int64),
+vintage_kind (latest|true|pseudo|mixed), params (JSON string), git_sha, package_version,
+catalog_hash, created_at (timestamp UTC)`.
+
+One row per fit that was saved. A number without its vintage and its code is not a result, so
+`asof`, `seed`, `params` and `git_sha` are what make a stored figure arguable later.
+
+### model_outputs
+`model_run_id, table_name, row_ix (int32), column_name, value_num (nullable float64),
+value_txt (nullable string)`.
+
+Every table a model returns, melted: one row per (table, row, column). Wide storage would need
+a migration for each analysis added, and the analyses do not agree on a shape — coefficients are
+indexed by name, impulse responses by horizon, fitted values by period. Exactly one of
+`value_num` and `value_txt` is set; reading a table back pivots it, which
+`econmodels.results.load_result` does.
+
 ## Conventions
 
 - Dates are tz-naive DATE; timestamps are UTC. `ECONBASE_TZ` (default `America/Sao_Paulo`)
   only decides which calendar date a fetch instant maps to for `realtime_start`.
 - `freq` lives on the series row. Resampling takes an explicit aggregation
-  (`last | mean | sum | eop`) and never guesses.
+  (`last | mean | sum | eop | compound`) and never guesses. Rates of change take
+  `compound`: they do not add, and adding them is wrong by more than a rounding error.
 - `Store` and `api` return `pyarrow.Table`; pandas conversion happens at the edge.
 - Asset prices (OHLCV) will NOT be forced into `observations`; they get their own physical
   tables when the first instrument is ingested (ADR-0005). The `table` field on the catalog
