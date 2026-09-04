@@ -185,3 +185,30 @@ def test_date_windows_validates_its_arguments() -> None:
 def test_a_single_day_range_is_one_window() -> None:
     day = dt.date(2026, 1, 1)
     assert date_windows(day, day) == [(day, day)]
+
+
+@respx.mock
+def test_a_prebuilt_query_survives_the_request(client: Client, clock: FakeClock) -> None:
+    """A URL that already carries a query must reach the server exactly as written.
+
+    httpx replaces a URL's query with whatever `params` holds, so passing an empty dict used to
+    strip it silently. An OData request that must encode its spaces as %20 then arrived with no
+    filter at all and the server answered with the entire series instead of the two rows asked
+    for — a wrong answer, not an error.
+    """
+    route = respx.get(url__startswith="https://example.test/odata").mock(
+        return_value=httpx.Response(200, json={"value": []})
+    )
+    client.get("https://example.test/odata?%24top=2&%24filter=A%20eq%20'B'", source="demo")
+    sent = str(route.calls[0].request.url)
+    assert "%24top=2" in sent or "$top=2" in sent
+    assert "A%20eq%20'B'" in sent or "A eq 'B'" in sent
+    assert "+" not in sent.split("?", 1)[1]
+
+
+@respx.mock
+def test_params_still_work_when_they_are_given(client: Client) -> None:
+    route = respx.get(URL).mock(return_value=httpx.Response(200, json={}))
+    client.get(URL, {"series_id": "X", "limit": 5}, source="demo")
+    params = dict(route.calls[0].request.url.params)
+    assert params["series_id"] == "X" and params["limit"] == "5"

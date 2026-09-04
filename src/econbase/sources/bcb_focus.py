@@ -87,12 +87,8 @@ class BcbFocusSource(Source):
                 }
             )
             full_url = f"{url_path}?{query}"
-            self.client._wait_turn(self.name)
-            response = self.client._client.get(full_url)
-            if response.status_code >= 400:
-                raise SourceError(
-                    f"bcb_focus: HTTP {response.status_code} for {full_url}: {response.text[:200]}"
-                )
+            # the query is pre-encoded (%20, not +), so it travels in the URL, not in params
+            response = self.client.get(full_url, source=self.name)
             last_url = str(response.request.url)
             pages.append(response.content)
 
