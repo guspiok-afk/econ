@@ -78,6 +78,11 @@ comment on the issue instead of editing it.
    `agent:antigravity`, `agent:ollama` (Jules is additionally triggered by its own `jules`
    label). The issue body links the WP file.
 3. One branch per WP: `wp/NN-<slug>`. Never commit to `main`.
+   **`C:\dev\econ` belongs to whichever agent is running there.** Never switch its branch
+   while someone else is working: the checkout deletes their files from disk mid-task and they
+   see the work package's own tests vanish. Anyone needing a second branch at the same time
+   takes a worktree of their own (`git worktree add C:\dev\econ-<name> <branch>`); the
+   architect works from `C:\dev\econ-claude`.
 4. Open a PR to `main`. CI (ruff + pytest) must be green. The architect (Claude Code)
    reviews and merges. Address review comments in the same branch.
 5. Do not start a WP whose acceptance tests do not exist yet; ask for them.

@@ -330,6 +330,11 @@ class Catalog:
     def aliases(self) -> dict[str, str]:
         return dict(self._aliases)
 
+    @property
+    def concept_map(self) -> dict[tuple[str, str], str]:
+        """``(entity_id, concept_id) -> series_id`` for every mapped concept."""
+        return dict(self._by_concept)
+
     # ------------------------------------------------------------------ exports
     @cached_property
     def catalog_hash(self) -> str:
