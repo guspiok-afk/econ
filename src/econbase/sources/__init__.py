@@ -25,6 +25,8 @@ log = logging.getLogger(__name__)
 #: Connector modules to import when building the registry (WP-02 fills this list).
 CONNECTOR_MODULES: tuple[str, ...] = (
     "econbase.sources.fred",
+    "econbase.sources.bcb_sgs",
+    "econbase.sources.bcb_focus",
     "econbase.sources.sidra",
     "econbase.sources.ipeadata",
 )

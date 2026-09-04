@@ -78,6 +78,11 @@ comment on the issue instead of editing it.
    `agent:antigravity`, `agent:ollama` (Jules is additionally triggered by its own `jules`
    label). The issue body links the WP file.
 3. One branch per WP: `wp/NN-<slug>`. Never commit to `main`.
+   **`C:\dev\econ` belongs to whichever agent is running there.** Never switch its branch
+   while someone else is working: the checkout deletes their files from disk mid-task and they
+   see the work package's own tests vanish. Anyone needing a second branch at the same time
+   takes a worktree of their own (`git worktree add C:\dev\econ-<name> <branch>`); the
+   architect works from `C:\dev\econ-claude`.
 4. Open a PR to `main`. CI (ruff + pytest) must be green. The architect (Claude Code)
    reviews and merges. Address review comments in the same branch.
 5. Do not start a WP whose acceptance tests do not exist yet; ask for them.
@@ -93,6 +98,11 @@ comment on the issue instead of editing it.
   session without design decisions.
 - **Antigravity (interactive, Manager view):** iterative work: analyses with a golden test,
   notebooks, reports, debugging, anything needing back-and-forth with the maintainer.
+  It offers Gemini 3.8/3.7/3.6 Flash, Gemini 3.1 Pro, Claude Sonnet 4.6, Claude Opus 4.6
+  (Thinking) and GPT-OSS 120B. **Pick the model that fits the task, not the cheapest one:**
+  Opus 4.6 Thinking or Gemini 3.1 Pro for a whole work package, Flash for a mechanical pass.
+  The Claude and GPT models share one weekly quota and the Gemini models have their own, which
+  matters only as a fallback — if one pool runs dry, the other still works.
 - **Ollama (local model, mechanical):** docstrings, unit tests from a spec, YAML catalog
   entries from a list, recording fixtures, formatting, secondary PR review. Never core,
   schema or vintage logic.
