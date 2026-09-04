@@ -1,0 +1,36 @@
+# FRED (Federal Reserve Bank of St. Louis).
+# Seed entries added with the connector (WP-02a) so the pipeline can be exercised end to end.
+# The full US catalog arrives in WP-02e.
+#
+# Licence: FRED series carry the terms of their original producer (BEA, BLS, Treasury...).
+# Redistribution is not granted in general, so these stay local-only until each series is
+# checked individually.
+source: fred
+defaults:
+  entity_id: US
+  license: FRED terms of use (https://fred.stlouisfed.org/legal/)
+  redistributable: false
+  domain: macro
+series:
+  - native_id: GDPC1
+    concept_id: gdp_real
+    title: Real Gross Domestic Product
+    unit: billions of chained 2017 dollars
+    freq: Q
+    seasonal_adj: true
+    expected_lag_days: 30
+    source_url: https://fred.stlouisfed.org/series/GDPC1
+    # revised for years; FRED's own vintages are the point of this series
+    params: {vintages: true}
+
+  - native_id: DGS10
+    concept_id: govt_yield_10y
+    title: Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity
+    unit: percent per year
+    freq: B
+    calendar: SIFMA
+    expected_lag_days: 1
+    source_url: https://fred.stlouisfed.org/series/DGS10
+    # ~5100 vintage dates: past FRED's 2000-vintage ceiling, so the store keeps pseudo
+    # real-time intervals from the collection date instead (see docs/adr/0002)
+    params: {vintages: false}

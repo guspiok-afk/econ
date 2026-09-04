@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | ready (spec written; implementation not started) |
+| Status | 02a in progress; 02b-02e ready to dispatch |
 | Suggested executor | split into sub-packages below (`agent:claude` for 02a; others dispatchable) |
 | Branch | `wp/02-connectors` (sub-packages may use `wp/02b-...`, `wp/02c-...` from it) |
 | Issue | (open one per sub-package when dispatched) |
@@ -18,23 +18,33 @@ returns the `FetchResult` contract from `src/econbase/sources/base.py`.
 
 ## Contract (applies to every connector)
 
+Updated after the WP-01 review (PR #2): fetching and parsing are separate so the pipeline can
+archive the bytes **before** anything interprets them.
+
 ```python
+@register
 class XSource(Source):
-    name = "x"                                   # == source segment of series_id
-    def fetch(self, spec: SeriesSpec, since: date | None = None) -> FetchResult: ...
+    name = "x"  # == source segment of series_id
+
+    def fetch_raw(self, spec: SeriesSpec, since: date | None = None) -> RawResponse: ...
+    def parse(self, raw: RawResponse, spec: SeriesSpec) -> pd.DataFrame: ...
 ```
 
-- `FetchResult.frame` columns: `period` (datetime.date, period START), `value` (float or NaN);
-  vintaged sources add `realtime_start`, `realtime_end` (date or None).
-- `FetchResult.raw_body`: the exact bytes received (the pipeline archives them);
-  `raw_ext` = `json | xml | csv | xlsx`; `url` = the request URL (the pipeline redacts keys).
-- `FetchResult.covers_from`: `None` when the frame is the complete history; the first period of
-  the window otherwise (windowed fetches never close periods outside the window).
+- `RawResponse.body`: the exact bytes received; `ext` = `json | xml | csv | xlsx`;
+  `url` = the request URL (the pipeline redacts credentials before persisting it).
+  Never parse inside `fetch_raw`: a parser failure must still leave the bytes archived.
+- `RawResponse.covers_from`: `None` when the response is the complete history; otherwise the
+  first period of the window. The pipeline then ignores stored **and** incoming periods
+  outside it, so a windowed fetch can never close or duplicate anything outside the window.
+- `parse` returns columns `period` (datetime.date, period START), `value` (float or NaN);
+  vintaged sources add `realtime_start` and `realtime_end` (date or None; `realtime_end` is
+  mandatory, and `9999-12-31` is accepted and stored as NULL).
 - Values must be numeric already: parse decimals in the connector (`"0,21"` → `0.21`); missing
-  markers (`"."`, `""`, `"-"`) → `NaN`. Never let strings reach the pipeline.
+  markers (`"."`, `""`, `"-"`) → `NaN`. A string reaching the pipeline is an error.
+- Dates must be `datetime.date` already; ISO strings are rejected.
 - `spec.params` carries source-specific arguments (documented per source below).
 - Use `econbase.sources.http.Client` for every request. No connector owns a retry loop, a
-  sleep, or its own `httpx.Client`.
+  sleep, or its own `httpx.Client`. Raise `SourceError` for anything the source got wrong.
 - Register with `@register`; add the module path to `CONNECTOR_MODULES` in `sources/__init__.py`.
 - Tests: `tests/test_source_<name>.py` with `respx` fixtures under `tests/fixtures/<name>/`
   (JSON/CSV/XLSX bodies recorded from the real API, credentials stripped). One test per
@@ -42,7 +52,22 @@ class XSource(Source):
 
 ## Sub-packages
 
-### WP-02a — shared HTTP helper + FRED (executor `agent:claude`)
+### WP-02a — shared HTTP helper + FRED (executor `agent:claude`) — DONE
+
+Delivered on `wp/02-connectors`. Two things the live API taught us, both now handled:
+
+1. **FRED refuses a full real-time period for series with more than 2000 vintage dates**
+   (HTTP 400). Daily rate series are past it. `params: {vintages: false}` then requests the
+   current values only and the store keeps pseudo real-time intervals, like the Brazilian
+   sources; the connector raises an error naming that fix rather than degrading silently.
+2. **FRED's `realtime_end` is the last day a value was current; this project stores the first
+   day it was not.** The connector adds a day (and maps the `9999-12-31` sentinel to NULL).
+   Copying the field verbatim would make an as-of query on the last day of a vintage return
+   nothing at all.
+
+Original specification below.
+
+
 
 `src/econbase/sources/http.py`:
 - `Client(settings)` wrapping one `httpx.Client(timeout=settings.econbase_http_timeout,
@@ -73,7 +98,7 @@ class XSource(Source):
 Rules: the API caps a request at 10 years for daily series, so iterate `date_windows` from
 `spec.params.get("start", "1980-01-01")` to today and concatenate; `period` = `data` parsed
 `%d/%m/%Y` (monthly series come as day 01); `valor` via `to_float`. Full history each run
-(`covers_from=None`). `raw_body` = concatenation of window bodies as a JSON array.
+(`covers_from=None`). `RawResponse.body` = the window bodies concatenated as one JSON array.
 Series in the initial catalog: 433, 4466, 11427, 16121, 432, 4189, 24363, 1, 10813, 7806,
 20539, 20714, 21082, 4380, 13521, 22701, 13762 (verify each id exists with one request).
 
