@@ -8,6 +8,11 @@ Convenções deste manual: comandos em blocos são para o **PowerShell** do Wind
 indicação. Caminhos fixos: repositório em `C:\dev\econ`; dados em
 `%LOCALAPPDATA%\econbase\data` (nunca no OneDrive ou no Google Drive).
 
+**Duas metades.** As seções 4, 5, 6 e 9.1 (Ollama, Antigravity, Jules e o ciclo de um pacote
+de trabalho) valem para qualquer projeto seu e vão migrar para o kit de operação de agentes
+quando ele existir. As demais são específicas do `econ`: chave do FRED, pasta de dados,
+backup, agendamento e comandos da base.
+
 ---
 
 ## 0. Checklist geral

@@ -2,3 +2,5 @@
 # Rule (docs/IDENTIFIERS.md): an id may never disappear. Removing an entry from the YAML
 # requires leaving its id in the `aliases` of the successor entry; tests/test_catalog_ids.py
 # enforces this against the list below. Append new ids when you add series.
+fred:GDPC1
+fred:DGS10

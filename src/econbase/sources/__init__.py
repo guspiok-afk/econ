@@ -10,12 +10,20 @@ import importlib
 import logging
 
 from econbase.settings import Settings
-from econbase.sources.base import FetchResult, Source, StaticSource, available, register
+from econbase.sources.base import (
+    FetchResult,
+    RawResponse,
+    Source,
+    SourceError,
+    StaticSource,
+    available,
+    register,
+)
 
 log = logging.getLogger(__name__)
 
 #: Connector modules to import when building the registry (WP-02 fills this list).
-CONNECTOR_MODULES: tuple[str, ...] = ()
+CONNECTOR_MODULES: tuple[str, ...] = ("econbase.sources.fred",)
 
 
 def build_registry(settings: Settings | None = None) -> dict[str, Source]:
@@ -31,7 +39,9 @@ def build_registry(settings: Settings | None = None) -> dict[str, Source]:
 __all__ = [
     "CONNECTOR_MODULES",
     "FetchResult",
+    "RawResponse",
     "Source",
+    "SourceError",
     "StaticSource",
     "available",
     "build_registry",

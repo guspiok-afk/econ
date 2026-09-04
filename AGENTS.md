@@ -18,6 +18,13 @@ Two Python packages in one repository, one `pyproject.toml`:
 The full design lives in `docs/` (CONTRACT.md, IDENTIFIERS.md, adr/). Read the relevant doc
 before touching the area it covers.
 
+**Portability note.** Sections 4, 5 and 7, and the general half of 6 and 8, are the operating
+process and are project-independent: they will be lifted verbatim into a separate
+agent-operations kit once each executor has completed at least one work package here (the
+status board in section 10 tracks that). Keep project facts out of them — data rules,
+protected files, dependency pins and source specifics belong in sections 1-3, 9 and 10. When
+you edit this file, put your change on the correct side of that line.
+
 ## 2. Non-negotiable data rules
 
 1. **Parquet is the system of record.** The DuckDB file is a disposable cache of views,
@@ -145,3 +152,12 @@ comment on the issue instead of editing it.
   Impulso (Bayesian VAR), gEconpy (DSGE, optional extra `econmodels[dsge]`).
 - Methodology PDFs (KC Fed LMCI, NY Fed GSCPI SR1017, Atlanta Fed sticky CPI, GDPNow
   explainer) are summarized in `docs/methodology/` when a WP needs them.
+
+## 10. Project status board
+
+A living board tracks phases, work packages and what is waiting on the maintainer:
+https://claude.ai/code/artifact/93f5a13e-3e87-4f86-a439-e3dddbdd9398
+
+Claude Code updates it whenever a work package is delivered, a PR is merged, or a decision
+changes. It is a view, not a source of truth: the work-package files under
+`docs/work-packages/` and the pull requests remain authoritative.
