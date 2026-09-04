@@ -106,4 +106,37 @@ than reaching the store.
 
 ## Result
 
-(filled in by the executor: paste the update output here)
+Executed by the local model (`qwen3-coder:30b` through Aider) on 2026-09-04, then corrected by
+the architect. **36 acceptance tests pass, 253 in the whole suite, ruff clean.**
+
+### What the model got right
+
+All thirty entries, every field: concept, frequency, unit, seasonal adjustment, publication
+lag, source URL and the `vintages` flag on the four series that need it. Once the two format
+problems below were fixed, 35 of 36 tests passed with no substantive correction at all. For a
+bulk transcription this is a good result.
+
+### What it got wrong, and what that teaches
+
+1. **Six titles contain a colon** (`Consumer Price Index for All Urban Consumers: All Items`)
+   and were written unquoted, which is invalid YAML. The work package said "use the same shape
+   as the existing entries", and none of those had a colon, so there was no example to copy —
+   partly a gap in the specification rather than in the model.
+2. **A markdown code fence was written into the file.** The model emitted the file inside a
+   fenced block and the closing fence landed in the YAML.
+3. **`catalog/ids.txt` was never touched.** The second half of the task was skipped silently.
+
+The lesson for the next mechanical package: give the local model one file at a time, show an
+example of every awkward case it will meet, and have the acceptance test read the file as text
+before parsing it, so a stray fence fails with a clear message.
+
+### Live verification
+
+`uv run python -m econbase.cli update --source fred` — **30 series, 0 errors, 470,669
+observations.** Some vintage histories are large, which is the point: TOTCI carries 167,649
+rows, the two Kansas City Fed labour indices about 46,500 each, and industrial production
+39,356.
+
+Economic checks: sticky CPI at 2.72% against flexible at 1.09% year on year (July 2026); the
+Atlanta Fed nowcast reading 4.75% for the third quarter; and the vintage test that only this
+kind of base can answer — April 2020 unemployment was published at 14.7% and now reads 14.8%.
