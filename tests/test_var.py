@@ -23,9 +23,8 @@ import pytest
 
 pytest.importorskip("econmodels.var", reason="WP-04d not implemented yet")
 
-from econmodels.var import VectorAutoregression
-
 from econmodels.base import RunContext
+from econmodels.var import VectorAutoregression
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "us_quarterly_var.csv"
 SAMPLE_END = "2019-10-01"  # 2020 dominates any linear VAR; the package documents the cut

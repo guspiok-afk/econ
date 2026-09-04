@@ -56,8 +56,8 @@ class VectorAutoregression:
     def __init__(
         self,
         entity: str,
-        lags: int | str = 4,                 # an integer, or "aic" | "bic" | "hqic"
-        max_lags: int = 8,                   # only consulted when lags is a criterion
+        lags: int | str = 4,  # an integer, or "aic" | "bic" | "hqic"
+        max_lags: int = 8,  # only consulted when lags is a criterion
         horizon: int = 24,
         order: tuple[str, str, str] = ("inflation", "output", "policy"),
         identification: str = "cholesky",
