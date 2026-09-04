@@ -19,9 +19,8 @@ import pytest
 
 pytest.importorskip("econmodels.parity", reason="WP-04a not implemented yet")
 
-from econmodels.parity import UncoveredParity
-
 from econmodels.base import RunContext
+from econmodels.parity import UncoveredParity
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "br_us_monthly_parity.csv"
 HORIZON = 12
