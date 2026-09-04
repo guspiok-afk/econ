@@ -284,39 +284,50 @@ def test_focus_pages_until_a_short_page(focus: BcbFocusSource) -> None:
 
 
 # ---------------------------------------------------------------- end to end
+CONCEPTS_YAML = """concepts:
+  cpi_headline: {description: IPCA, unit_kind: pct, default_agg: sum}
+  policy_rate: {description: Selic, unit_kind: pct_pa, default_agg: eop}
+  inflation_expectations_12m:
+    description: Focus IPCA 12 months ahead
+    unit_kind: pct
+    default_agg: last
+"""
+
+ENTITIES_YAML = """entities:
+  - {entity_id: BR, entity_type: country, name: Brazil}
+"""
+
+SGS_YAML = """source: bcb_sgs
+defaults: {entity_id: BR, license: BCB open data, redistributable: true}
+series:
+  - native_id: '433'
+    concept_id: cpi_headline
+    title: IPCA
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+"""
+
+FOCUS_YAML = """source: bcb_focus
+defaults: {entity_id: BR, license: BCB open data, redistributable: true}
+series:
+  - native_id: ExpectativasMercadoInflacao12Meses/IPCA
+    concept_id: inflation_expectations_12m
+    title: Focus IPCA 12 months ahead
+    unit: pct
+    freq: D
+    expected_lag_days: 7
+"""
+
+
 @pytest.fixture
 def br_catalog(tmp_path: Path) -> Catalog:
     root = tmp_path / "catalog"
     (root / "br").mkdir(parents=True)
-    (root / "concepts.yaml").write_text(
-        "concepts:\n"
-        "  cpi_headline: {description: IPCA, unit_kind: pct, default_agg: sum}\n"
-        "  policy_rate: {description: Selic, unit_kind: pct_pa, default_agg: eop}\n"
-        "  inflation_expectations_12m: {description: Focus IPCA 12m, unit_kind: pct, default_agg: last}\n",
-        encoding="utf-8",
-    )
-    (root / "entities.yaml").write_text(
-        "entities:\n  - {entity_id: BR, entity_type: country, name: Brazil}\n", encoding="utf-8"
-    )
-    (root / "br" / "sgs.yaml").write_text(
-        "source: bcb_sgs\n"
-        "defaults: {entity_id: BR, license: BCB open data, redistributable: true}\n"
-        "series:\n"
-        "  - {native_id: '433', concept_id: cpi_headline, title: IPCA, unit: pct, freq: M, expected_lag_days: 12}\n",
-        encoding="utf-8",
-    )
-    (root / "br" / "focus.yaml").write_text(
-        "source: bcb_focus\n"
-        "defaults: {entity_id: BR, license: BCB open data, redistributable: true}\n"
-        "series:\n"
-        "  - native_id: ExpectativasMercadoInflacao12Meses/IPCA\n"
-        "    concept_id: inflation_expectations_12m\n"
-        "    title: Focus IPCA 12 months ahead\n"
-        "    unit: pct\n"
-        "    freq: D\n"
-        "    expected_lag_days: 7\n",
-        encoding="utf-8",
-    )
+    (root / "concepts.yaml").write_text(CONCEPTS_YAML, encoding="utf-8")
+    (root / "entities.yaml").write_text(ENTITIES_YAML, encoding="utf-8")
+    (root / "br" / "sgs.yaml").write_text(SGS_YAML, encoding="utf-8")
+    (root / "br" / "focus.yaml").write_text(FOCUS_YAML, encoding="utf-8")
     return Catalog.load(root)
 
 
