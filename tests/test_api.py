@@ -274,3 +274,25 @@ def test_connect_opens_the_real_catalog(data_dir: Path) -> None:
     api = connect("catalog")
     assert "fred:GDPC1" in api.catalog.series
     assert api.store.data_dir == data_dir.resolve()
+
+
+def test_a_panel_uses_each_concept_default_aggregation(loaded: Api) -> None:
+    """One aggregation cannot be right for a price change, a policy rate and an index."""
+    panel = loaded.get_panel(["gdp_real", "govt_yield_10y"], entity="US", freq="Q")
+    eop = loaded.get("govt_yield_10y", entity="US", freq="Q", agg="eop")
+    assert float(panel["govt_yield_10y"].dropna().iloc[0]) == pytest.approx(
+        float(eop["value"].iloc[0])
+    ), "the concept declares eop, so the panel must not average the yield"
+
+
+def test_a_panel_accepts_an_aggregation_per_series(loaded: Api) -> None:
+    panel = loaded.get_panel(
+        ["gdp_real", "govt_yield_10y"],
+        entity="US",
+        freq="Q",
+        agg={"govt_yield_10y": "mean"},
+    )
+    mean = loaded.get("govt_yield_10y", entity="US", freq="Q", agg="mean")
+    assert float(panel["govt_yield_10y"].dropna().iloc[0]) == pytest.approx(
+        float(mean["value"].iloc[0])
+    )

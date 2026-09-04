@@ -3,9 +3,10 @@
 # aggregation used when converting to a lower frequency unless the caller overrides it.
 concepts:
   cpi_headline:
+    # a percentage change compounds into a longer period; averaging one means nothing
     description: Headline consumer price index, monthly percentage change
     unit_kind: pct
-    default_agg: sum
+    default_agg: compound
   cpi_headline_index:
     description: Headline consumer price index level
     unit_kind: index
@@ -13,7 +14,7 @@ concepts:
   cpi_core:
     description: Core consumer price index (ex food and energy or central bank core), monthly percentage change
     unit_kind: pct
-    default_agg: sum
+    default_agg: compound
   cpi_sticky:
     description: Sticky-price CPI, annualized monthly percentage change
     unit_kind: pct
@@ -43,9 +44,11 @@ concepts:
     unit_kind: pct_pa
     default_agg: eop
   gdp_real:
+    # published as an index (Brazil) or an annualized level (United States); neither is a flow
+    # that may be summed across quarters
     description: Real GDP, seasonally adjusted, chained volume
     unit_kind: level
-    default_agg: sum
+    default_agg: mean
   gdp_nowcast:
     description: Official or replicated GDP nowcast, annualized quarterly growth
     unit_kind: pct

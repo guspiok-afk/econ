@@ -19,7 +19,7 @@ FREQUENCIES: tuple[str, ...] = ("D", "B", "W", "M", "Q", "A")
 ENTITY_TYPES: tuple[str, ...] = ("country", "instrument", "issuer", "index", "region")
 RUN_STATUSES: tuple[str, ...] = ("ok", "partial", "failed")
 TRIGGERS: tuple[str, ...] = ("manual", "scheduler", "ci")
-AGGREGATIONS: tuple[str, ...] = ("last", "mean", "sum", "eop")
+AGGREGATIONS: tuple[str, ...] = ("last", "mean", "sum", "eop", "compound")
 
 _TS_UTC = pa.timestamp("us", tz="UTC")
 

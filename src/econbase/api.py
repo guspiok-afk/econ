@@ -13,7 +13,7 @@ worth running.
 from __future__ import annotations
 
 import datetime as dt
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -155,7 +155,7 @@ class Api:
         end: dt.date | str | None = None,
         asof: dt.date | str | None = None,
         freq: str | None = None,
-        agg: str | None = None,
+        agg: str | Mapping[str, str] | None = None,
         transform: str | None = None,
         how: str = "outer",
     ) -> pd.DataFrame:
@@ -164,6 +164,11 @@ class Api:
         With ``entities`` the same concepts are fetched for each country and the columns are
         named ``concept@entity``; otherwise a column takes the concept's name, or the series id
         when the series carries no concept.
+
+        ``agg`` accepts a mapping from key to aggregation as well as a single string. Prefer
+        the mapping, or nothing at all: a panel mixes a price change, a policy rate and an
+        index, and one aggregation cannot be right for all three. Left out, each concept uses
+        the aggregation its catalog entry declares.
         """
         wanted = list(keys)
         if not wanted:
@@ -184,12 +189,13 @@ class Api:
             # are actually being converted; `get` still rejects a pointless agg on its own
             resolved = self.resolve(key, ent)
             needs_agg = freq is not None and freq != resolved.spec.freq
+            chosen = agg.get(key) if isinstance(agg, dict) else agg
             frame = self.get(
                 key,
                 entity=ent,
                 asof=asof,
                 freq=freq,
-                agg=agg if needs_agg else None,
+                agg=chosen if needs_agg else None,
                 transform=transform,
                 as_pandas=True,
             )

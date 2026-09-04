@@ -173,3 +173,37 @@ def test_an_empty_series_survives_every_transform() -> None:
     for name in transforms.TRANSFORMS:
         assert transforms.apply(empty, name, freq="M").empty
     assert transforms.resample(empty, from_freq="M", to_freq="Q", agg="last").empty
+
+
+def test_compounding_is_the_right_way_to_aggregate_a_rate_of_change() -> None:
+    """Three months of 0.67, 0.58 and 0.16 make a quarter of 1.4159%.
+
+    Their average, 0.47, is a number with no economic meaning, and their sum, 1.41, misses the
+    cross terms. Prices compound.
+    """
+    f = frame([("2026-04-01", 0.67), ("2026-05-01", 0.58), ("2026-06-01", 0.16)])
+    out = transforms.resample(f, from_freq="M", to_freq="Q", agg="compound")
+    assert list(out["period"]) == [dt.date(2026, 4, 1)]
+    assert float(out["value"].iloc[0]) == pytest.approx(1.4159, abs=1e-4)
+
+    plain_mean = float(
+        transforms.resample(f, from_freq="M", to_freq="Q", agg="mean")["value"].iloc[0]
+    )
+    plain_sum = float(
+        transforms.resample(f, from_freq="M", to_freq="Q", agg="sum")["value"].iloc[0]
+    )
+    assert plain_mean == pytest.approx(0.47)
+    assert plain_sum == pytest.approx(1.41)
+
+
+def test_compounding_handles_negative_rates_and_gaps() -> None:
+    f = frame([("2026-01-01", 1.0), ("2026-02-01", -0.5), ("2026-03-01", None)])
+    out = transforms.resample(f, from_freq="M", to_freq="Q", agg="compound")
+    expected = ((1.01 * 0.995) - 1) * 100
+    assert float(out["value"].iloc[0]) == pytest.approx(expected)
+
+
+def test_compounding_a_quarter_with_no_data_yields_nothing() -> None:
+    f = frame([("2026-01-01", 1.0), ("2026-07-01", 2.0)])
+    out = transforms.resample(f, from_freq="M", to_freq="Q", agg="compound")
+    assert list(out["period"]) == [dt.date(2026, 1, 1), dt.date(2026, 7, 1)]

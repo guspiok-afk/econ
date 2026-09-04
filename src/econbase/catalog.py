@@ -34,7 +34,7 @@ CONCEPT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 ENTITY_RE = re.compile(r"^[A-Z]{2}$|^[a-z][a-z0-9_]*:[A-Za-z0-9._\-]+$")
 
 Frequency = Literal["D", "B", "W", "M", "Q", "A"]
-Aggregation = Literal["last", "mean", "sum", "eop"]
+Aggregation = Literal["last", "mean", "sum", "eop", "compound"]
 EntityType = Literal["country", "instrument", "issuer", "index", "region"]
 
 

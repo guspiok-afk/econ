@@ -80,9 +80,16 @@ def _as_frame(series: pd.Series) -> pd.DataFrame:
 def resample(frame: pd.DataFrame, *, from_freq: str, to_freq: str, agg: str) -> pd.DataFrame:
     """Convert a ``period``/``value`` frame to a coarser frequency.
 
-    ``agg`` is one of ``last``, ``eop``, ``mean``, ``sum``. ``last`` and ``eop`` both take the
-    final observation of the period; they differ only for strictly regular data, which economic
-    series rarely are, so they are kept as synonyms rather than as a false distinction.
+    ``agg`` is one of ``last``, ``eop``, ``mean``, ``sum``, ``compound``.
+
+    ``last`` and ``eop`` both take the final observation of the period; they differ only for
+    strictly regular data, which economic series rarely are, so they are kept as synonyms
+    rather than as a false distinction.
+
+    ``compound`` is the one that matters for a rate of change. Three monthly inflation rates of
+    0.67, 0.58 and 0.16 make a quarter of 1.4159%, not their average of 0.47 and not quite
+    their sum of 1.41: prices compound. Averaging a monthly rate into a quarter produces a
+    number that means nothing at all, so a percentage-change series must never use ``mean``.
     """
     _check_freq(from_freq)
     _check_freq(to_freq)
@@ -103,8 +110,14 @@ def resample(frame: pd.DataFrame, *, from_freq: str, to_freq: str, agg: str) -> 
         out = grouper.mean()
     elif agg == "sum":
         out = grouper.sum(min_count=1)
+    elif agg == "compound":
+        out = grouper.apply(
+            lambda g: (
+                (np.prod(1.0 + g.dropna() / 100.0) - 1.0) * 100.0 if g.notna().any() else np.nan
+            )
+        )
     else:
-        raise TransformError(f"unknown aggregation {agg!r}; use last, eop, mean or sum")
+        raise TransformError(f"unknown aggregation {agg!r}; use last, eop, mean, sum or compound")
     return _as_frame(out.dropna(how="all"))
 
 
