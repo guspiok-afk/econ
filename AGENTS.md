@@ -18,12 +18,11 @@ Two Python packages in one repository, one `pyproject.toml`:
 The full design lives in `docs/` (CONTRACT.md, IDENTIFIERS.md, adr/). Read the relevant doc
 before touching the area it covers.
 
-**Portability note.** Sections 4, 5 and 7, and the general half of 6 and 8, are the operating
-process and are project-independent: they will be lifted verbatim into a separate
-agent-operations kit once each executor has completed at least one work package here (the
-status board in section 10 tracks that). Keep project facts out of them — data rules,
-protected files, dependency pins and source specifics belong in sections 1-3, 9 and 10. When
-you edit this file, put your change on the correct side of that line.
+**Where the process lives.** The operating half of this file — sections 4, 5 and 7, and the
+general part of 6 and 8 — was extracted into a reusable kit at `C:\devgent-kit` once all
+four executors had delivered a package here. That kit is the version other projects copy; this
+file is its instance, plus everything specific to `econ`. A change to the *process* belongs in
+both; a change to the *project* belongs only here.
 
 ## 2. Non-negotiable data rules
 
