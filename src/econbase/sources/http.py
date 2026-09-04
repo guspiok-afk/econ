@@ -147,15 +147,8 @@ class Client:
 
         def _attempt() -> httpx.Response:
             self._wait_turn(source)
-            # transport errors (timeout, connection reset) propagate for tenacity to retry.
-            # `params` travels only when it holds something: httpx replaces a URL's existing
-            # query with whatever `params` contains, so passing an empty dict silently strips a
-            # query the caller built by hand — which is how an OData request that must encode
-            # its spaces as %20 would reach the server unfiltered.
-            kwargs: dict[str, object] = {"headers": dict(headers or {})}
-            if params:
-                kwargs["params"] = dict(params)
-            response = self._client.get(url, **kwargs)
+            # transport errors (timeout, connection reset) propagate for tenacity to retry
+            response = self._client.get(url, params=dict(params or {}), headers=dict(headers or {}))
             if response.status_code in RETRY_STATUSES:
                 pause = self._retry_after(response)
                 if pause:
