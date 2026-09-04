@@ -1,0 +1,54 @@
+[
+  {
+    "NC": "Nível Territorial (Código)",
+    "NN": "Nível Territorial",
+    "MC": "Unidade de Medida (Código)",
+    "MN": "Unidade de Medida",
+    "V": "Valor",
+    "D1C": "Brasil (Código)",
+    "D1N": "Brasil",
+    "D2C": "Variável (Código)",
+    "D2N": "Variável",
+    "D3C": "Mês (Código)",
+    "D3N": "Mês"
+  },
+  {
+    "NC": "1",
+    "NN": "Brasil",
+    "MC": "",
+    "MN": "",
+    "V": "...",
+    "D1C": "1",
+    "D1N": "Brasil",
+    "D2C": "63",
+    "D2N": "IPCA - Variação mensal",
+    "D3C": "197912",
+    "D3N": "dezembro 1979"
+  },
+  {
+    "NC": "1",
+    "NN": "Brasil",
+    "MC": "2",
+    "MN": "%",
+    "V": "6.62",
+    "D1C": "1",
+    "D1N": "Brasil",
+    "D2C": "63",
+    "D2N": "IPCA - Variação mensal",
+    "D3C": "198001",
+    "D3N": "janeiro 1980"
+  },
+  {
+    "NC": "1",
+    "NN": "Brasil",
+    "MC": "2",
+    "MN": "%",
+    "V": "4.62",
+    "D1C": "1",
+    "D1N": "Brasil",
+    "D2C": "63",
+    "D2N": "IPCA - Variação mensal",
+    "D3C": "198002",
+    "D3N": "fevereiro 1980"
+  }
+]
