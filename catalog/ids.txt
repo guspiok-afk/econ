@@ -4,3 +4,11 @@
 # enforces this against the list below. Append new ids when you add series.
 fred:GDPC1
 fred:DGS10
+sidra:1737/63
+sidra:1737/2266
+sidra:1620/583
+sidra:6381/4099
+sidra:8888/12606
+sidra:8880/7169
+sidra:5906/8677
+ipeadata:BM12_TJOVER12

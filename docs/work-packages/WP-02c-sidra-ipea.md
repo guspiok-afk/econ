@@ -149,4 +149,33 @@ The fixtures are recorded; the suite must not touch the network.
 
 ## Result
 
-(filled in by the executor)
+Delivered on branch `wp/02c-sidra` (2026-09-04), 15 acceptance tests green, full suite 146
+passed, ruff clean.
+
+### Connectors implemented
+
+- **`src/econbase/sources/sidra.py`** — `SidraSource` with freq-aware period code parsing.
+  The core judgement call: `_parse_period_code` uses the catalog `freq` to resolve SIDRA's
+  ambiguous six-digit codes (`202403` → March 2024 for `M`, Q3 2024 for `Q`). A mismatch
+  between code shape and frequency raises `SourceError` rather than silently misdating data.
+  The period column is found dynamically via `_find_period_column` matching header labels
+  (`Mês`, `Trimestre`, `Trimestre Móvel`, `Ano`) so tables with extra dimensions work.
+  Missing values (`"..."`) pass through `to_float` → NaN. Responses are always decoded as
+  UTF-8.
+
+- **`src/econbase/sources/ipeadata.py`** — `IpeadataSource` taking only the date part of
+  IPEA timestamps (before the `T`) to avoid DST-related date shifts. Empty series (IPEA's
+  way of signalling a nonexistent code) raise `SourceError`.
+
+### Catalog entries
+
+`catalog/br/ibge_sidra.yaml` (7 series) and `catalog/br/ipeadata.yaml` (1 series), all IDs
+appended to `catalog/ids.txt`.
+
+### Retired IDs
+
+None encountered. All eight catalog IDs return data from the live APIs as of 2026-09-04.
+
+### Deviations
+
+None. `src/econbase/sources/http.py` was not modified. No new dependencies.
