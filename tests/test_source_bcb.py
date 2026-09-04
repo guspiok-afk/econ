@@ -32,8 +32,8 @@ from econbase.store import Store
 pytest.importorskip("econbase.sources.bcb_sgs", reason="WP-02b not implemented yet")
 pytest.importorskip("econbase.sources.bcb_focus", reason="WP-02b not implemented yet")
 
-from econbase.sources.bcb_focus import BcbFocusSource  # noqa: E402
-from econbase.sources.bcb_sgs import BcbSgsSource  # noqa: E402
+from econbase.sources.bcb_focus import BcbFocusSource
+from econbase.sources.bcb_sgs import BcbSgsSource
 
 SGS_FIX = Path(__file__).parent / "fixtures" / "bcb_sgs"
 FOCUS_FIX = Path(__file__).parent / "fixtures" / "bcb_focus"
@@ -115,7 +115,9 @@ def test_sgs_parses_a_business_day_series(sgs: BcbSgsSource) -> None:
 
 def test_sgs_parses_a_windowed_body_made_of_several_pages(sgs: BcbSgsSource) -> None:
     """A windowed fetch archives a JSON array of window bodies; parse must merge them."""
-    merged = b"[" + sgs_body("433_ipca_2026.json") + b"," + sgs_body("432_selic_ago2026.json") + b"]"
+    merged = (
+        b"[" + sgs_body("433_ipca_2026.json") + b"," + sgs_body("432_selic_ago2026.json") + b"]"
+    )
     frame = sgs.parse(RawResponse(body=merged), sgs_spec("433"))
     assert len(frame) == 7 + 31
 
@@ -343,7 +345,9 @@ def test_update_stores_both_sources(
         "SGS has no vintages, so the store records pseudo real-time intervals"
     )
 
-    expectations = schemas.to_pandas(store.observations(["bcb_focus:ExpectativasMercadoInflacao12Meses/IPCA"]))
+    expectations = schemas.to_pandas(
+        store.observations(["bcb_focus:ExpectativasMercadoInflacao12Meses/IPCA"])
+    )
     assert len(expectations) == 5
 
     raw_index = schemas.to_pandas(store.read("raw_index"))
@@ -371,8 +375,11 @@ def test_a_revision_of_a_brazilian_series_opens_a_second_interval(
     sources = {"bcb_sgs": sgs, "bcb_focus": focus}
     for day in (4, 5):
         pipeline.update(
-            store, br_catalog, sources,
-            now=dt.datetime(2026, 9, day, 12, tzinfo=dt.UTC), tz="America/Sao_Paulo",
+            store,
+            br_catalog,
+            sources,
+            now=dt.datetime(2026, 9, day, 12, tzinfo=dt.UTC),
+            tz="America/Sao_Paulo",
         )
     history = schemas.to_pandas(store.observations(["bcb_sgs:433"], include_history=True))
     july = history[history["period"] == dt.date(2026, 7, 1)].sort_values("realtime_start")

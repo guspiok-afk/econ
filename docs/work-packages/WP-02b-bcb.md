@@ -44,9 +44,11 @@ fixtures reproduce each one.
 ```python
 ENDPOINT = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{native_id}/dados"
 
+
 @register
 class BcbSgsSource(Source):
     name = "bcb_sgs"
+
     def fetch_raw(self, spec: SeriesSpec, since: date | None = None) -> RawResponse: ...
     def parse(self, raw: RawResponse, spec: SeriesSpec) -> pd.DataFrame: ...
 ```
@@ -81,6 +83,7 @@ Parameters on the catalog entry (`params`):
 
 ```python
 BASE = "https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata"
+
 
 @register
 class BcbFocusSource(Source):
