@@ -57,3 +57,17 @@ fred:DTWEXBGS
 dbnomics:BCB/bop/S1-A
 dbnomics:BCB/bop/S1-Q
 file_http:nyfed_gscpi
+bcb_sgs:4466
+bcb_sgs:11427
+bcb_sgs:16121
+bcb_sgs:24364
+bcb_sgs:4513
+bcb_sgs:20541
+bcb_sgs:20542
+bcb_sgs:20716
+bcb_sgs:20717
+bcb_sgs:21084
+bcb_sgs:21085
+bcb_sgs:22707
+bcb_sgs:22708
+bcb_sgs:22701

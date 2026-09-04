@@ -100,3 +100,104 @@ series:
     freq: M
     expected_lag_days: 30
     source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=13762
+
+  - native_id: '4466'
+    concept_id: cpi_core
+    title: "Índice nacional de preços ao consumidor-Amplo (IPCA) - Núcleo médias aparadas com suavização"
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '11427'
+    title: "Índice nacional de preços ao consumidor - Amplo (IPCA) - Núcleo por exclusão - Sem monitorados e alimentos no domicílio"
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '16121'
+    title: "Índice nacional de preços ao consumidor - Amplo (IPCA) - Núcleo por exclusão - ex2"
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '24364'
+    title: "Índice de Atividade Econômica do Banco Central (IBC-Br) - com ajuste sazonal"
+    unit: index
+    freq: M
+    seasonal_adj: true
+    expected_lag_days: 45
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '4513'
+    title: "Dívida Líquida do Setor Público (% PIB) - Total - Setor público consolidado"
+    unit: pct of GDP
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '20541'
+    title: "Saldo da carteira de crédito - Pessoas físicas - Total"
+    unit: BRL million
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '20542'
+    title: "Saldo da carteira de crédito com recursos livres - Total"
+    unit: BRL million
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '20716'
+    title: "Taxa média de juros das operações de crédito - Pessoas físicas - Total"
+    unit: pct per year
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '20717'
+    title: "Taxa média de juros das operações de crédito com recursos livres - Total"
+    unit: pct per year
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '21084'
+    title: "Inadimplência da carteira de crédito - Pessoas físicas - Total"
+    unit: pct
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '21085'
+    title: "Inadimplência da carteira de crédito com recursos livres - Total"
+    unit: pct
+    freq: M
+    expected_lag_days: 30
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '22707'
+    concept_id: trade_balance
+    title: "Balança comercial - Balanço de Pagamentos - mensal - saldo"
+    unit: USD million
+    freq: M
+    expected_lag_days: 25
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '22708'
+    title: "Exportação de bens - Balanço de Pagamentos - mensal"
+    unit: USD million
+    freq: M
+    expected_lag_days: 25
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '22701'
+    title: "Transações correntes - mensal - saldo"
+    unit: USD million
+    freq: M
+    expected_lag_days: 25
+    source_url: https://www3.bcb.gov.br/sgspub/

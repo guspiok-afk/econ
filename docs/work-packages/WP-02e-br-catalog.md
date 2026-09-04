@@ -98,4 +98,51 @@ message, and it compares every title character by character against the official
 
 ## Result
 
-(filled in by the executor: paste the update output here)
+Written by Claude after three attempts with `qwen3-coder:30b` through Aider: the model produced
+the right content every time and never produced a usable edit block — it stopped after its plan
+twice, and on the third run emitted a malformed diff whose filename line Aider read as
+`source_url: https://www3.bcb.gov.br/sgspub/`. Lesson 5 of the kit holds and is now paid for:
+the local model is worth its cost on mechanical content, not on file surgery.
+
+`uv run pytest tests/test_catalog_br.py -q` — 19 passed. Full suite 286 passed, ruff clean.
+
+`uv run python -m econbase.cli update --source bcb_sgs`:
+
+```
+    series_id  rows_fetched  rows_new  rows_revised  rows_closed error
+  bcb_sgs:433           559       559             0            0  None
+bcb_sgs:13522           548       548             0            0  None
+  bcb_sgs:432         10046     10046             0            0  None
+   bcb_sgs:11         10092     10092             0            0  None
+bcb_sgs:24363           282       282             0            0  None
+    bcb_sgs:1         10468     10468             0            0  None
+ bcb_sgs:7806          5006      5006             0            0  None
+bcb_sgs:20539           458       458             0            0  None
+bcb_sgs:20714           185       185             0            0  None
+bcb_sgs:21082           185       185             0            0  None
+ bcb_sgs:4649           296       296             0            0  None
+bcb_sgs:13762           236       236             0            0  None
+ bcb_sgs:4466           416       416             0            0  None
+bcb_sgs:11427           427       427             0            0  None
+bcb_sgs:16121           427       427             0            0  None
+bcb_sgs:24364           282       282             0            0  None
+ bcb_sgs:4513           296       296             0            0  None
+bcb_sgs:20541           233       233             0            0  None
+bcb_sgs:20542           233       233             0            0  None
+bcb_sgs:20716           185       185             0            0  None
+bcb_sgs:20717           185       185             0            0  None
+bcb_sgs:21084           185       185             0            0  None
+bcb_sgs:21085           185       185             0            0  None
+bcb_sgs:22707           379       379             0            0  None
+bcb_sgs:22708           379       379             0            0  None
+bcb_sgs:22701           379       379             0            0  None
+run 20260904T171755Z-635b6e (ok): 26 series, 0 error(s)
+```
+
+All fourteen new identifiers answered with data and parsed: the three cores go back to 1991
+(4466) and 1990 (11427, 16121), the seasonally adjusted IBC-Br matches the unadjusted series in
+length, and the three balance-of-payments series carry 379 months each.
+
+`rows_new` equals `rows_fetched` for every series because this run wrote into an empty store —
+see the note on the desktop app's private data directory in `docs/OPERATION.md`. It is a first
+load, not a revision, and says nothing about the store the scheduled task maintains.
