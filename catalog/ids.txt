@@ -4,3 +4,6 @@
 # enforces this against the list below. Append new ids when you add series.
 fred:GDPC1
 fred:DGS10
+dbnomics:BCB/bop/S1-A
+dbnomics:BCB/bop/S1-Q
+file_http:nyfed_gscpi

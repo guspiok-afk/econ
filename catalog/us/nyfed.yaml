@@ -1,0 +1,14 @@
+source: file_http
+defaults: {entity_id: WW, license: NY Fed terms of use, redistributable: false}
+series:
+  - native_id: nyfed_gscpi
+    concept_id: supply_chain_pressure
+    title: Global Supply Chain Pressure Index
+    unit: standard deviations from the mean
+    freq: M
+    expected_lag_days: 10
+    params:
+      url: https://www.newyorkfed.org/medialibrary/research/interactives/gscpi/downloads/gscpi_data.xlsx
+      sheet: GSCPI Monthly Data
+      skiprows: 5
+      period_is_end: true

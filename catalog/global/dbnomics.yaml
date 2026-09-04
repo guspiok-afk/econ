@@ -1,0 +1,8 @@
+source: dbnomics
+series:
+  - native_id: BCB/bop/S1-A
+    title: Brazil current account, annual
+    freq: A
+  - native_id: BCB/bop/S1-Q
+    title: Brazil current account, quarterly
+    freq: Q

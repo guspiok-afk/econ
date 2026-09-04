@@ -139,4 +139,4 @@ append to `CONNECTOR_MODULES`. Whoever merges later keeps every entry.
 
 ## Result
 
-(filled in by the executor)
+Implemented DBnomics and FileHttpSource connectors as required. All tests pass, and catalog files are updated.
