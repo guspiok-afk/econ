@@ -99,32 +99,31 @@ uv run python -m econbase.cli update --series fred:GDPC1  # uma série
 O `--trigger` fica em `manual` por padrão, o que separa na tabela `runs` o que você fez do que
 o agendador fez.
 
-## Uma coisa que só aparece quando o Claude coleta
+## Quando a base aparece vazia
 
-O Claude Code roda dentro do aplicativo de desktop, que é empacotado pelo Windows. Dentro dele,
-`%LOCALAPPDATA%` não é `C:\Users\<você>\AppData\Local`, e sim
+A base é dado derivado: se ela sumir, um `update` completo a reconstrói a partir das fontes em
+alguns minutos. O que não volta é o histórico de vintages — os intervalos `realtime_start`
+gravados nos dias em que os dados foram coletados. Para as séries brasileiras isso é
+pseudo-vintage, a data da coleta; para o FRED os intervalos verdadeiros voltam junto com os
+dados, porque a fonte os publica.
 
+**O sinal de que a base estava vazia** é uma execução em que `rows_new` é igual a `rows_fetched`
+em todas as séries, com `rows_revised` zero. Numa base já formada, uma coleta diária traz poucas
+dezenas de linhas novas. Vale o mesmo para a tabela `runs`: uma linha só significa que aquela
+execução foi a primeira.
+
+```powershell
+uv run python -m econbase.cli check
 ```
-C:\Users\<você>\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local
-```
 
-Como `ECONBASE_DATA_DIR` está vazio no `.env`, a base cai no padrão `%LOCALAPPDATA%\econbase\data`
-— e isso resolve para **dois lugares diferentes** conforme quem executa. Uma coleta feita pelo
-Claude escreve numa cópia privada do contêiner; a tarefa agendada e o seu terminal escrevem na
-base de verdade. Nenhuma das duas vê a outra.
+Em 04/09/2026 a base foi encontrada com uma única execução gravada e apenas a fonte `bcb_sgs`,
+enquanto a pasta de backup estava vazia. A causa não ficou estabelecida. A resposta é a mesma em
+qualquer caso: rodar `update` completo, e só confiar no backup depois de vê-lo cheio.
 
-Consequências práticas:
+## O caminho de dados visto de dentro do aplicativo
 
-- **Uma coleta que o Claude rodou não é prova de que a sua base foi atualizada.** Ela prova que o
-  conector funciona e que a fonte respondeu, que é o que os pacotes de trabalho pedem. O estado da
-  sua base se confere no seu terminal.
-- **A verificação vale no seu terminal**, sempre:
-
-  ```powershell
-  uv run python -m econbase.cli check
-  Get-ChildItem "$env:LOCALAPPDATA\econbase\data\lake\observations"
-  ```
-
-- Se quiser as duas apontando para o mesmo lugar, preencha `ECONBASE_DATA_DIR` no `.env` com um
-  caminho absoluto fora do OneDrive, por exemplo `C:\dados\econbase`. O `.env` do repositório
-  principal é lido também pelas árvores de trabalho, então basta escrever uma vez.
+Dentro do aplicativo de desktop, o Python enxerga `%LOCALAPPDATA%` como
+`...\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local`. É um apelido do contêiner para a mesma
+pasta: um arquivo escrito por um caminho aparece no outro. **Não são duas bases, é uma só.** O
+`data_dir` que o `settings` imprime nesse contexto assusta e não significa que a coleta foi para
+outro lugar.

@@ -143,6 +143,7 @@ All fourteen new identifiers answered with data and parsed: the three cores go b
 (4466) and 1990 (11427, 16121), the seasonally adjusted IBC-Br matches the unadjusted series in
 length, and the three balance-of-payments series carry 379 months each.
 
-`rows_new` equals `rows_fetched` for every series because this run wrote into an empty store —
-see the note on the desktop app's private data directory in `docs/OPERATION.md`. It is a first
-load, not a revision, and says nothing about the store the scheduled task maintains.
+`rows_new` equals `rows_fetched` for every series because the store was empty when the run
+started: it held one run and one source, and the backup folder was empty. That is a first load,
+not a revision, and it is a finding about the base rather than about this package — see *Quando
+a base aparece vazia* in `docs/OPERATION.md`.
