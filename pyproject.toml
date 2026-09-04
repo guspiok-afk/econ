@@ -36,6 +36,10 @@ dev = [
   "pytest>=8.3",
   "ruff>=0.8",
   "respx>=0.22",
+  # the analysis stack is an optional extra for anyone who only wants the data, but the tests
+  # of econmodels need it, so it is part of the development environment
+  "statsmodels>=0.15",
+  "scipy>=1.14",
 ]
 
 [build-system]
