@@ -372,9 +372,9 @@ Abra sempre em modo somente leitura. O escritor único é o `econbase update`.
 | marco | estado | o que você decide |
 |---|---|---|
 | WP-01, fundação | pronto | contrato de dados aprovado |
-| WP-02, conectores e catálogo | pronto | 55 séries de 7 fontes, ~520 mil observações |
+| WP-02, conectores e catálogo | pronto | 69 séries de 7 fontes, cerca de 524 mil observações |
 | WP-03a, transformações e API | pronto | as análises pedem conceitos, não identificadores |
-| WP-03b, rotina diária | em revisão | **criar as tarefas agendadas** (seção 7.3) |
+| WP-03b, rotina diária | pronto | tarefas criadas; falta **ver o backup cheio uma vez** |
 | Fase 4, análises tier 1 | a fazer | validar contra referência: Taylor, Phillips, paridade |
 | Fase 5, nowcasting e índices | a fazer | validar o backtest com vintages |
 | Fase 6, DSGE | a fazer | validar contra o Dynare |
