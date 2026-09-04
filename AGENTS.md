@@ -94,10 +94,10 @@ comment on the issue instead of editing it.
 - **Antigravity (interactive, Manager view):** iterative work: analyses with a golden test,
   notebooks, reports, debugging, anything needing back-and-forth with the maintainer.
   It offers Gemini 3.8/3.7/3.6 Flash, Gemini 3.1 Pro, Claude Sonnet 4.6, Claude Opus 4.6
-  (Thinking) and GPT-OSS 120B, on **two separate quotas**: one for the Gemini models, one
-  shared by the Claude and GPT models. Default to a Gemini model so the shared pool stays
-  free — Flash for mechanical passes, 3.1 Pro for a work package — and spend Opus 4.6
-  Thinking only on a design-sensitive change or a bug that resisted a first attempt.
+  (Thinking) and GPT-OSS 120B. **Pick the model that fits the task, not the cheapest one:**
+  Opus 4.6 Thinking or Gemini 3.1 Pro for a whole work package, Flash for a mechanical pass.
+  The Claude and GPT models share one weekly quota and the Gemini models have their own, which
+  matters only as a fallback — if one pool runs dry, the other still works.
 - **Ollama (local model, mechanical):** docstrings, unit tests from a spec, YAML catalog
   entries from a list, recording fixtures, formatting, secondary PR review. Never core,
   schema or vintage logic.
