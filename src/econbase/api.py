@@ -147,7 +147,7 @@ class Api:
 
     def get_panel(
         self,
-        keys: Iterable[str],
+        keys: Iterable[str | tuple[str, str]],
         *,
         entity: str | None = None,
         entities: Sequence[str] | None = None,
@@ -161,20 +161,40 @@ class Api:
     ) -> pd.DataFrame:
         """Several series aligned on one period index, one column each.
 
+        A key is a concept, a series id, or a ``(concept, entity)`` pair. The pair form is what
+        a model spanning two countries needs: uncovered parity wants the exchange rate and the
+        policy rate for Brazil and the policy rate for the United States, which is neither the
+        cross product ``entities`` builds — no series carries ``fx_spot_usd`` for the United
+        States — nor the single-country form. A pair always names its column ``concept@entity``.
+
         With ``entities`` the same concepts are fetched for each country and the columns are
         named ``concept@entity``; otherwise a column takes the concept's name, or the series id
         when the series carries no concept.
+
+        The index is a ``DatetimeIndex``: models resample, filter and shift on it, and every
+        test fixture in this repository parses its dates, so returning anything else would mean
+        validating a model against one kind of index and running it on another.
         """
         wanted = list(keys)
         if not wanted:
             raise ApiError("get_panel needs at least one key")
+        pairs = [k for k in wanted if isinstance(k, tuple)]
+        if pairs and entities:
+            raise ApiError(
+                "pass either (concept, entity) pairs or `entities`, not both: "
+                f"{[f'{c}@{e}' for c, e in pairs]} already name their entity"
+            )
         targets: list[tuple[str, str | None, str]] = []
         if entities:
             for ent in entities:
                 for k in wanted:
-                    targets.append((k, ent, f"{k}@{ent}"))
+                    targets.append((str(k), ent, f"{k}@{ent}"))
         else:
             for k in wanted:
+                if isinstance(k, tuple):
+                    concept, ent = k
+                    targets.append((concept, ent, f"{concept}@{ent}"))
+                    continue
                 resolved = self.resolve(k, entity)
                 targets.append((k, entity, resolved.label))
 
@@ -200,7 +220,7 @@ class Api:
             )
         panel = pd.concat(columns.values(), axis=1, join="inner" if how == "inner" else "outer")
         panel = panel.sort_index()
-        panel.index = pd.DatetimeIndex(panel.index).date
+        panel.index = pd.DatetimeIndex(panel.index)
         panel.index.name = "period"
         return _trim_index(panel, _as_date(start, "start"), _as_date(end, "end"))
 
