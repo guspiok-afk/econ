@@ -145,3 +145,12 @@ comment on the issue instead of editing it.
   Impulso (Bayesian VAR), gEconpy (DSGE, optional extra `econmodels[dsge]`).
 - Methodology PDFs (KC Fed LMCI, NY Fed GSCPI SR1017, Atlanta Fed sticky CPI, GDPNow
   explainer) are summarized in `docs/methodology/` when a WP needs them.
+
+## 10. Project status board
+
+A living board tracks phases, work packages and what is waiting on the maintainer:
+https://claude.ai/code/artifact/93f5a13e-3e87-4f86-a439-e3dddbdd9398
+
+Claude Code updates it whenever a work package is delivered, a PR is merged, or a decision
+changes. It is a view, not a source of truth: the work-package files under
+`docs/work-packages/` and the pull requests remain authoritative.
