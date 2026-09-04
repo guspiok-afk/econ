@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   A rotina diária: coleta, verifica o frescor, atualiza o cache de consultas e faz o backup.
 

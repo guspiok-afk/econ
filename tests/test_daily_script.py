@@ -18,10 +18,28 @@ from econbase.cli import app
 ROOT = Path(__file__).resolve().parents[1]
 DAILY = ROOT / "scripts" / "daily.ps1"
 BACKUP = ROOT / "scripts" / "backup.ps1"
+BOM = bytes.fromhex("efbbbf")
 
 
 def test_the_scripts_exist() -> None:
     assert DAILY.is_file() and BACKUP.is_file()
+
+
+@pytest.mark.parametrize("script", [DAILY, BACKUP], ids=lambda p: p.name)
+def test_an_accented_script_carries_a_byte_order_mark(script: Path) -> None:
+    """Windows PowerShell 5.1 reads a file without a byte order mark as ANSI.
+
+    A script whose own literals contain accents then loads them already mangled, and writes the
+    damage into every log line it produces - the log being the one thing read when something
+    breaks. The mark costs three bytes and makes the file self-describing.
+    """
+    raw = script.read_bytes()
+    if raw.decode("utf-8").isascii():
+        pytest.skip(f"{script.name} is pure ASCII; the mark would change nothing")
+    assert raw.startswith(BOM), (
+        f"{script.name} holds accented text and must start with a UTF-8 byte order mark, "
+        "or Windows PowerShell 5.1 reads its own strings as ANSI"
+    )
 
 
 def commands_called() -> set[str]:
