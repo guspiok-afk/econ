@@ -75,6 +75,93 @@ fica comparável à literatura sem ressalva.
 
 ---
 
+## 6. Não existe série de expectativas de inflação para os Estados Unidos
+
+**Onde apareceu:** ao preparar a curva de Phillips. O mapa de conceitos por país mostra
+`inflation_expectations_12m` só para o Brasil, vindo do Focus. O catálogo americano não tem nem
+o SPF da Filadélfia nem a pesquisa de Michigan.
+
+**O que eu supus:** que a expectativa entra como `ConceptRequest(..., optional=True)` — o campo
+já existe no contrato e nunca foi exercitado. O modelo roda na forma híbrida quando a série
+está lá e na forma puramente retrospectiva quando não está, dizendo qual usou no diagnóstico.
+Assim a curva roda nos dois países hoje, e melhora quando a série americana entrar.
+
+**Se você discordar:** acrescentar `MICH` (Michigan, mensal, já no FRED) é meia hora; o SPF é um
+conector novo de uma tarde.
+
+## 7. `cpi_headline` não existe para os Estados Unidos
+
+**Onde apareceu:** o mesmo mapa. O Brasil publica a variação mensal (`bcb_sgs:433`) e os Estados
+Unidos publicam o índice (`fred:CPIAUCSL`). O conceito `cpi_headline_index` existe nos dois; o
+`cpi_headline` só no Brasil.
+
+**O que eu supus:** que todo modelo portátil pede `cpi_headline_index` e calcula a variação por
+dentro, que é o que a regra de Taylor já faz. É mais robusto do que manter dois conceitos que
+significam a mesma coisa em unidades diferentes.
+
+**Se você discordar:** a alternativa é gravar `cpi_headline` para os Estados Unidos como série
+derivada, o que exerceria o caminho de derivadas — mas duplica dado que já está na base.
+
+---
+
 ## Bloqueantes
 
-Nenhum por enquanto.
+Estes eu não decido sozinho porque a escolha é sua, de economista, e muda o trabalho.
+
+### B1. Curva de Phillips: qual especificação?
+
+**Por que não decido:** experimentei duas e as duas são ruins, de maneiras que dizem algo.
+
+Mensal, inflação em 12 meses, expectativa do Focus, desemprego em nível, 161 meses de 2013:
+
+| | coef. | p |
+|---|---:|---:|
+| expectativa | 0,224 | 0,003 |
+| inflação defasada | 0,912 | 0,000 |
+| desemprego | +0,037 | 0,260 |
+
+O R² de 0,96 é ilusão: regredir a inflação de doze meses contra ela mesma um mês antes é quase
+uma identidade. O desemprego sai insignificante e com o sinal errado.
+
+Trimestral, inflação anualizada do trimestre, hiato do desemprego por filtro HP, 57 trimestres:
+
+| | coef. | p |
+|---|---:|---:|
+| expectativa | 2,386 | 0,000 |
+| inflação defasada | 0,030 | 0,766 |
+| hiato do desemprego | **+0,928** | 0,090 |
+
+Aqui γ_f + γ_b = 2,42, o que viola a verticalidade de longo prazo, e o hiato do desemprego entra
+com **sinal positivo** — mais desemprego, mais inflação.
+
+**As escolhas que mudam o resultado, e que são suas:**
+
+1. **Qual medida de folga.** Desemprego, hiato do produto, utilização da capacidade. A PNAD só
+   começa em 2012, o que dá 57 trimestres — pouco para separar folga de choque.
+2. **Qual inflação.** Cheia, núcleo (o catálogo tem três agora) ou preços livres. Para o Brasil
+   os administrados são um argumento forte para não usar a cheia.
+3. **Câmbio.** Uma curva de economia aberta sem repasse cambial é malespecificada, e o `fx_spot_usd@BR`
+   está na base. Isso pode ser o que explica o sinal errado do hiato: 2015 e 2021 tiveram
+   desemprego alto e inflação alta ao mesmo tempo, com o câmbio no meio.
+4. **Impor γ_f + γ_b = 1** ou deixar a soma livre como diagnóstico.
+
+**O que eu faria se você mandasse escolher:** núcleo por médias aparadas, hiato do produto pelo
+IBC-Br, repasse cambial com quatro defasagens, soma restrita a 1, e o teste de aceitação
+cobrando sinal e magnitude do repasse em vez de um número da folga. Mas essa é a análise em que
+o julgamento vale mais que a implementação, e enfiar uma especificação ruim num teste de
+aceitação a congela.
+
+### B2. Sticky/flex CPI brasileiro: qual classificação de itens?
+
+**Por que não decido:** o método do Fed de Atlanta separa os itens pela **frequência de reajuste
+de preço**, medida em microdados. Para o Brasil não existe equivalente publicado, e a
+classificação é a análise inteira: escolhida de um jeito, o índice mede rigidez; escolhida de
+outro, mede só os administrados.
+
+**As opções:** replicar a classificação americana por correspondência de itens da COICOP;
+adotar uma classificação da literatura brasileira; ou usar a divisão do próprio Banco Central
+entre livres e administrados, que é observável e defensável mas mede outra coisa.
+
+**O que eu faria:** a terceira, chamando o resultado pelo nome certo — administrados contra
+livres — e deixando o sticky de verdade para quando houver microdado. Mas isso muda o que o
+índice significa, e o nome importa.
