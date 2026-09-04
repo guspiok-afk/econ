@@ -1,0 +1,24 @@
+# Banco Central do Brasil — Focus market expectations survey.
+source: bcb_focus
+defaults:
+  entity_id: BR
+  license: BCB open data
+  redistributable: true
+  domain: macro
+series:
+  - native_id: ExpectativasMercadoInflacao12Meses/IPCA
+    concept_id: inflation_expectations_12m
+    title: Focus IPCA 12 months ahead market expectation
+    unit: pct
+    freq: D
+    expected_lag_days: 7
+    source_url: https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/aplicacao#!/recursos/ExpectativasMercadoInflacao12Meses
+
+  - native_id: ExpectativasMercadoAnuais/Selic
+    concept_id: policy_rate_expectations_eoy
+    title: Focus Selic year-end market expectation
+    unit: pct_pa
+    freq: D
+    expected_lag_days: 7
+    source_url: https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/aplicacao#!/recursos/ExpectativasMercadoAnuais
+    params: {data_referencia: "2026"}

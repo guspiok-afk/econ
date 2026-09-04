@@ -4,3 +4,17 @@
 # enforces this against the list below. Append new ids when you add series.
 fred:GDPC1
 fred:DGS10
+bcb_sgs:433
+bcb_sgs:13522
+bcb_sgs:432
+bcb_sgs:11
+bcb_sgs:24363
+bcb_sgs:1
+bcb_sgs:7806
+bcb_sgs:20539
+bcb_sgs:20714
+bcb_sgs:21082
+bcb_sgs:4649
+bcb_sgs:13762
+bcb_focus:ExpectativasMercadoInflacao12Meses/IPCA
+bcb_focus:ExpectativasMercadoAnuais/Selic
