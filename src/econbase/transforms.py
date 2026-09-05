@@ -85,7 +85,45 @@ def _compound(values: pd.Series) -> float:
     return float(((1.0 + present / 100.0).prod() - 1.0) * 100.0)
 
 
-def resample(frame: pd.DataFrame, *, from_freq: str, to_freq: str, agg: str) -> pd.DataFrame:
+def _period_end_ts(period: pd.Timestamp, freq: str) -> pd.Timestamp:
+    """Last calendar day of the period that starts at ``period``."""
+    rule = {"M": "MonthEnd", "Q": "QuarterEnd", "A": "YearEnd", "W": None}.get(freq)
+    if freq == "W":
+        return period + pd.Timedelta(days=6)
+    if rule is None:
+        return period
+    return period + getattr(pd.offsets, rule)(0)
+
+
+def _drop_incomplete_tail(
+    out: pd.Series, source_last: pd.Timestamp, to_freq: str, from_freq: str
+) -> pd.Series:
+    """Remove trailing periods the source does not yet cover.
+
+    Aggregating April and May into "the second quarter" produces a number that reads as a closed
+    quarter and is not one. On the live base at 30 June 2024 that gave 0.842 for Brazilian
+    inflation where the finished quarter is 1.054 — a fifth of a point, presented as an
+    observation, with nothing to mark it. Under an as-of date it is worse than a rounding error:
+    a backtest compares a forecast of a whole quarter against two thirds of one.
+    """
+    # A period is labelled by its start, so the last source observation covers through the end of
+    # *its own* period: a June monthly figure completes the second quarter. Comparing against the
+    # label instead of the coverage drops finished quarters, which is what the transform tests
+    # caught the first time this was written.
+    covered_through = _period_end_ts(source_last, from_freq)
+    while len(out) and _period_end_ts(out.index[-1], to_freq) > covered_through:
+        out = out.iloc[:-1]
+    return out
+
+
+def resample(
+    frame: pd.DataFrame,
+    *,
+    from_freq: str,
+    to_freq: str,
+    agg: str,
+    drop_incomplete: bool = True,
+) -> pd.DataFrame:
     """Convert a ``period``/``value`` frame to a coarser frequency.
 
     ``agg`` is one of ``last``, ``eop``, ``mean``, ``sum``, ``compound``. ``last`` and ``eop``
@@ -122,7 +160,14 @@ def resample(frame: pd.DataFrame, *, from_freq: str, to_freq: str, agg: str) -> 
         out = grouper.apply(_compound)
     else:
         raise TransformError(f"unknown aggregation {agg!r}; use last, eop, mean, sum or compound")
-    return _as_frame(out.dropna(how="all"))
+    out = out.dropna(how="all")
+    # Only for coarse sources. Three months make a quarter, so a missing one distorts the number
+    # by a third and reads as a closed quarter; ten business days out of twenty make an average
+    # that is genuinely partial and genuinely wanted, and the calendar is the only thing that
+    # would say the month is over.
+    if drop_incomplete and len(series) and from_freq in ("M", "Q", "A"):
+        out = _drop_incomplete_tail(out, pd.Timestamp(series.index[-1]), to_freq, from_freq)
+    return _as_frame(out)
 
 
 # ---------------------------------------------------------------------------- rates of change

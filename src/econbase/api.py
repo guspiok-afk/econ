@@ -24,6 +24,7 @@ from econbase import schemas, transforms
 from econbase.catalog import Catalog, SeriesSpec
 from econbase.settings import Settings, get_settings
 from econbase.store import Store
+from econbase.vintages import VINTAGE_KINDS, VintageError, availability, pseudo_asof
 
 
 class ApiError(ValueError):
@@ -54,6 +55,8 @@ class Api:
     def __init__(self, store: Store, catalog: Catalog) -> None:
         self.store = store
         self.catalog = catalog
+        #: Which notion of "as of" each series last resolved under, for a result's diagnostics.
+        self._last_kind: dict[str, str] = {}
 
     # ------------------------------------------------------------------ resolution
     def resolve(self, key: str, entity: str | None = None) -> Key:
@@ -93,10 +96,52 @@ class Api:
         return sorted(e for (e, c) in self.catalog.concept_map if c == concept)
 
     # ------------------------------------------------------------------ reading
-    def _observations(self, key: Key, asof: dt.date | None) -> pd.DataFrame:
-        table = self.store.observations([key.series_id], asof=asof)
-        frame = schemas.to_pandas(table)[["period", "value"]]
-        return frame.sort_values("period").reset_index(drop=True)
+    def _observations(
+        self, key: Key, asof: dt.date | None, vintage_kind: str = "true"
+    ) -> pd.DataFrame:
+        """The rows for one series, as of a date, under one notion of "as of"."""
+        if vintage_kind not in VINTAGE_KINDS:
+            raise ApiError(f"vintage_kind must be one of {VINTAGE_KINDS}, not {vintage_kind!r}")
+        if asof is None or vintage_kind == "latest":
+            table = self.store.observations([key.series_id], asof=None)
+            frame = schemas.to_pandas(table)
+            frame = frame[frame["realtime_end"].isna()] if len(frame) else frame
+            self._last_kind[key.series_id] = "latest"
+            return frame[["period", "value"]].sort_values("period").reset_index(drop=True)
+
+        # include_history, not asof=None: the latter returns only the current value of each
+        # period, so every row carries the same open interval and no count of them could ever
+        # reveal a revision.
+        every = schemas.to_pandas(self.store.observations([key.series_id], include_history=True))
+        have = availability(every, key.spec)
+        kind = vintage_kind
+        if kind == "mixed":
+            kind = have.usable_kind
+
+        if kind == "true":
+            frame = schemas.to_pandas(self.store.observations([key.series_id], asof=asof))
+            # An empty answer is honest when the source itself had published nothing yet — a
+            # series with real vintages knows its own first release. It is an artefact when the
+            # series has no vintages at all and the only date on record is the day this project
+            # happened to collect it.
+            artefact = (
+                not have.has_true_vintages
+                and not every.empty
+                and have.earliest_known is not None
+                and asof < have.earliest_known
+            )
+            if frame.empty and artefact:
+                raise VintageError(
+                    f"{key.series_id} has no recorded history before {have.earliest_known}: this "
+                    f"project began collecting it then, so asking as of {asof} returns nothing. "
+                    "Use vintage_kind='pseudo' to simulate from the publication lag, or "
+                    "'mixed' to take real vintages where they exist and simulate elsewhere."
+                )
+        else:
+            frame = pseudo_asof(every, key.spec, asof)
+
+        self._last_kind[key.series_id] = kind
+        return frame[["period", "value"]].sort_values("period").reset_index(drop=True)
 
     def get(
         self,
@@ -106,6 +151,7 @@ class Api:
         start: dt.date | str | None = None,
         end: dt.date | str | None = None,
         asof: dt.date | str | None = None,
+        vintage_kind: str = "true",
         freq: str | None = None,
         agg: str | None = None,
         transform: str | None = None,
@@ -120,7 +166,7 @@ class Api:
         """
         resolved = self.resolve(key, entity)
         asof_date = _as_date(asof, "asof")
-        frame = self._observations(resolved, asof_date)
+        frame = self._observations(resolved, asof_date, vintage_kind)
 
         source_freq = resolved.spec.freq
         out_freq = freq or source_freq
@@ -154,6 +200,7 @@ class Api:
         start: dt.date | str | None = None,
         end: dt.date | str | None = None,
         asof: dt.date | str | None = None,
+        vintage_kind: str = "true",
         freq: str | None = None,
         agg: str | None = None,
         transform: str | None = None,
@@ -208,6 +255,7 @@ class Api:
                 key,
                 entity=ent,
                 asof=asof,
+                vintage_kind=vintage_kind,
                 freq=freq,
                 agg=agg if needs_agg else None,
                 transform=transform,
