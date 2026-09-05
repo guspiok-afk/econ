@@ -152,6 +152,20 @@ def test_missing_inputs_are_dropped_not_filled() -> None:
     assert n > 250
 
 
+def test_a_panel_of_the_wrong_shape_is_refused_rather_than_guessed() -> None:
+    """One column must never stand in for every concept the model asked for.
+
+    A resolver that falls back to "the only column there is" turns a malformed panel into a
+    regression of the exchange rate on itself, which returns a number instead of an error.
+    """
+    single = pd.DataFrame(
+        {"fx_spot_usd@BR": [1.0] * 100},
+        index=pd.date_range("2000-01-01", periods=100, freq="MS"),
+    )
+    with pytest.raises(KeyError, match=r"policy_rate@BR"):
+        UncoveredParity(base="BR", quote="US", horizon_months=HORIZON).fit(single, ctx())
+
+
 def test_the_model_declares_what_it_needs() -> None:
     """The panel is built from concepts, so the same model runs on another country."""
     needs = {r.concept for r in UncoveredParity(base="BR").requires}

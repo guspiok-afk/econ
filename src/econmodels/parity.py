@@ -41,17 +41,20 @@ class UncoveredParity:
         self.quote = quote
         self.horizon_months = horizon_months
 
-    def _resolve_column(self, panel: pd.DataFrame, concept: str, entity: str) -> str:
-        candidates = [
-            f"{concept}@{entity}",
-            f"{concept}_{entity}",
-            concept if len(panel.columns) == 1 else None,
-        ]
-        for col in candidates:
-            if col and col in panel.columns:
-                return col
+    @staticmethod
+    def _resolve_column(panel: pd.DataFrame, concept: str, entity: str) -> str:
+        """The one column name the contract allows, or a refusal that names what was there.
+
+        No fallback and no guessing: a panel carrying a single column would otherwise resolve
+        every concept to it, and the regression would run on the exchange rate against itself
+        and report a number rather than an error.
+        """
+        col = f"{concept}@{entity}"
+        if col in panel.columns:
+            return col
         raise KeyError(
-            f"Could not find column for concept '{concept}' and entity '{entity}' in panel"
+            f"the panel has no column {col!r}; it carries {sorted(map(str, panel.columns))}. "
+            "Build it with api.get_panel, which names columns concept@entity."
         )
 
     def fit(self, panel: pd.DataFrame, ctx: RunContext) -> Result:

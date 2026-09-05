@@ -13,6 +13,7 @@ import math
 from pathlib import Path
 
 import httpx
+import pandas as pd
 import pytest
 import respx
 
@@ -244,6 +245,34 @@ def test_a_panel_aligns_series_on_one_index(loaded: Api) -> None:
 def test_a_panel_across_countries_labels_the_columns(loaded: Api) -> None:
     panel = loaded.get_panel(["gdp_real"], entities=["US"])
     assert list(panel.columns) == ["gdp_real@US"]
+
+
+def test_a_pair_names_its_own_country(loaded: Api) -> None:
+    """The form a two-country model needs, and the one the cross product cannot express.
+
+    Uncovered parity wants the exchange rate and the policy rate for Brazil and the policy rate
+    for the United States. `entities=['BR','US']` asks for all four and fails on the one no
+    series carries; `entity='BR'` drops the suffix the models resolve on.
+    """
+    panel = loaded.get_panel([("gdp_real", "US"), ("govt_yield_10y", "US")], freq="Q", agg="mean")
+    assert list(panel.columns) == ["gdp_real@US", "govt_yield_10y@US"]
+
+
+def test_pairs_and_entities_together_are_refused(loaded: Api) -> None:
+    with pytest.raises(ApiError, match="not both"):
+        loaded.get_panel([("gdp_real", "US")], entities=["US"])
+
+
+def test_a_panel_carries_a_datetime_index(loaded: Api) -> None:
+    """Models resample, filter and shift on this index, and every fixture parses its dates.
+
+    Returning plain date objects meant a model was validated against one kind of index and run
+    against another, which is silent until a Hodrick-Prescott filter or a calendar-aware
+    operation quietly behaves differently.
+    """
+    panel = loaded.get_panel(["gdp_real"], entity="US")
+    assert isinstance(panel.index, pd.DatetimeIndex)
+    assert panel.index.name == "period"
 
 
 def test_an_inner_join_keeps_only_shared_periods(loaded: Api) -> None:
