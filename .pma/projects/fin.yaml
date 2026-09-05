@@ -1,0 +1,109 @@
+# Segundo projeto hospedado neste repositório. Ver `.pma/project.yaml` para o econ.
+# O manifesto do repositório é o do econ; este descreve um projeto que ainda não começou.
+schema: pma/1
+
+project:
+  id: fin
+  name: Preços de ativos e análises estruturais
+  repo: guspiok-afk/econ
+  root: 'C:\dev\econ'
+  status: paused                    # abre quando a fase 4 do econ fechar
+  priority: 2
+  summary: >
+    Base de preços de ativos brasileiros e globais com eventos corporativos e curvas de juros,
+    guardando o que se sabia em cada data, e as análises estruturais que rodam sobre ela:
+    fatores, prêmios de risco, carry e decomposição da estrutura a termo. É o irmão do econ,
+    com o mesmo contrato de dados e a mesma disciplina de não enxergar o futuro.
+
+goal: >
+  Que uma carteira testada em 2015 use exatamente os preços, proventos e curvas que existiam em
+  2015 — incluindo os que foram revisados depois — e que a curva de juros, os fatores e a
+  atribuição de retorno saiam da mesma base que se atualiza sozinha. Pronto quando um backtest
+  de dez anos rodar sem vazamento, a estrutura a termo brasileira reproduzir a ETTJ publicada
+  pela ANBIMA dentro do erro de ajuste, e a paridade coberta que o econ deixou em aberto por
+  falta de curva a termo puder finalmente ser medida.
+
+phases:
+  - {id: "01", title: "Fundação do domínio: tabelas físicas, proventos e ajuste na leitura", state: todo}
+  - {id: "02", title: "Brasil: COTAHIST, eventos corporativos, Tesouro Direto", state: todo}
+  - {id: "03", title: "Global: índices, câmbio e juros por fontes abertas", state: todo}
+  - {id: "04", title: "Estrutura a termo: ETTJ brasileira e curva americana ajustadas", state: todo}
+  - {id: "05", title: "Análises estruturais: fatores, prêmios de risco, carry e momento", state: todo}
+  - {id: "06", title: "Carteiras: atribuição de retorno, risco e backtest com data de conhecimento", state: todo}
+  - {id: "07", title: "Aplicativo", state: todo}
+
+decisions:
+  - question: Preços entram na tabela de observações do econ?
+    answer: >
+      Não. Preço tem abertura, máxima, mínima, fechamento, volume e ajuste no mesmo registro, e
+      forçar isso no formato longo multiplicaria as linhas por seis sem ganho. Tabelas físicas
+      próprias, despachadas pelo campo `table` do catálogo (ADR-0005 do econ).
+    reopen_when: nunca
+
+  - question: Preço ajustado por proventos é gravado ou calculado?
+    answer: >
+      Calculado na leitura, a partir da tabela de eventos corporativos e da data de conhecimento
+      pedida. Gravar o ajustado congela uma série que muda a cada provento novo, e é a mesma
+      razão pela qual o econ não pré-computa transformação.
+    reopen_when: >
+      O custo de calcular na leitura passar a doer num backtest longo; aí vira cache derivado
+      com versão de método, nunca fonte da verdade.
+
+  - question: Reaproveitar o `econbase` ou duplicar o armazenamento?
+    answer: >
+      Reaproveitar. O armazenamento bitemporal, o manifesto atômico, o catálogo e a API por
+      conceito são o mesmo problema, e foram os mais caros de acertar.
+    reopen_when: >
+      O domínio de preços precisar de um formato de arquivo que o `econbase` não sustente.
+
+  - question: Fontes com termo de uso restritivo entram na coleta automática?
+    answer: >
+      Não. `yfinance` e scrapers de páginas com proibição explícita ficam fora do `update`; se
+      forem usados, é à mão e sem redistribuição. O catálogo já carrega `license` e
+      `redistributable` por série, e eles passam a valer de verdade aqui.
+    reopen_when: >
+      Assinatura de uma fonte paga com termos que permitam automação.
+
+  - question: O projeto dá recomendação de investimento?
+    answer: >
+      Não. Ele produz medidas — prêmio, fator, atribuição, risco — e nunca uma sugestão de
+      compra ou venda. A distinção precisa sobreviver ao aplicativo, onde ela some sozinha se
+      ninguém a defender.
+    reopen_when: nunca
+
+  - question: Repositório próprio ou terceiro pacote dentro do econ?
+    answer: >
+      Terceiro pacote dentro do econ, com manifesto próprio em `.pma/projects/fin.yaml`. Separar
+      agora obrigaria a publicar o `econbase` como pacote versionado só para satisfazer um
+      formato de arquivo, e o domínio de preços reaproveita o núcleo inteiro.
+    reopen_when: >
+      Algo fora do repositório precisar fixar uma versão do `econbase` — um aplicativo hospedado
+      é exatamente isso, e por isso a separação provavelmente cai na fase 07.
+
+executors:
+  - name: "agent:claude"
+    validated: false
+    notes: >
+      arquiteto e integrador; no econ escreveu contratos, núcleo e todos os testes de aceitação,
+      e a revisão contra dados vivos pegou um defeito silencioso em cada PR de agente
+  - name: "agent:jules"
+    validated: false
+    notes: >
+      assíncrono, bom em pacote autocontido com teste pronto; no econ entregou conectores do
+      Banco Central, paridade descoberta e o VAR monetário
+  - name: "agent:antigravity"
+    validated: false
+    notes: >
+      interativo, para pacote com decisão de desenho; no econ entregou SIDRA/IPEA, DBnomics,
+      catálogo americano e a regra de Taylor. Modelo de raciocínio para pacote inteiro
+  - name: "agent:ollama"
+    validated: false
+    notes: >
+      local, sem cota; acerta o conteúdo e erra o formato. Serve para gerar, não para editar
+      arquivo — três tentativas no catálogo brasileiro, nenhuma com bloco de edição aproveitável
+
+interfaces: []                      # nada a consumir enquanto o projeto não começar
+
+commands:
+  test: uv run pytest -q
+  lint: uv run ruff check . ; uv run ruff format --check .
