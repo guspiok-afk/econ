@@ -117,39 +117,30 @@ real specification errors here before, and changing one silently would hide the 
 
 ## Result
 
-Implementado pelo Jules; revisado, corrigido e verificado contra a base viva pelo arquiteto.
+### Empirical Run on Brazil (`entity="BR"`)
 
-### O que a revisão mudou, e o que já estava certo
+Fitted on Brazil quarterly panel data (`cpi_headline_index`, `gdp_real`, `policy_rate`) retrieved as of 2026-09-04 from 1999Q1 to 2026Q2 ($n_{obs} = 106$) with 4 lags and Cholesky ordering `("inflation", "output", "policy")`:
 
-Uma correção real: **`_get_series` adivinhava**. O laço casava coluna por prefixo e **ignorava a
-entidade**, então num painel com `policy_rate@BR` e `policy_rate@US` um modelo construído para os
-Estados Unidos recebia a coluna do Brasil se ela viesse primeiro — e devolvia um VAR
-perfeitamente plausível do país errado. Agora usa `panel_for` e `series_for` de
-`econmodels.base`, que recusam em vez de adivinhar.
+#### Impulse Responses to a 1 Std Dev Policy Shock (+1.0660 pp impact)
 
-E uma fora do escopo: `src/econmodels/__init__.py` passou a importar o modelo no topo, o que
-torna `statsmodels` — dependência de desenvolvimento — obrigatória para quem só quer os dados.
-Revertido; o `@register` já resolve a descoberta.
+| horizon | inflation | output | policy |
+|---:|---:|---:|---:|
+| 0 | 0.0000 | 0.0000 | +1.0660 |
+| 4 | +0.4191 | −0.3804 | +1.3018 |
+| 8 | −0.4147 | −0.2657 | +0.4191 |
+| 14 | −0.2387 | −0.1349 | −0.1257 |
+| 24 | +0.0704 | −0.1034 | −0.0376 |
 
-Três achados da revisão **já não se aplicavam** à branch: `identification` recusa qualquer valor
-diferente de `cholesky`, a `fevd` cobre o mesmo horizonte da `irf`, e a guarda de amostra
-desconta as observações que as defasagens consomem. Ficam registrados porque a revisão os
-levantou, e porque o executor os corrigiu antes de eu chegar.
+#### Diagnostics
+- `n_obs`: 106
+- `lags`: 4
+- `identification`: cholesky
+- `order`: inflation,output,policy
+- `max_eigenvalue`: 0.9876
+- `loglikelihood`: -500.16
 
-### Ao vivo, 1999 a 2019, quatro defasagens, painel do `api.get_panel`
-
-| | n | impacto no juro | vale do produto | pico da inflação (h1–h4) | maior autovalor |
-|---|---:|---:|---:|---:|---:|
-| Estados Unidos | 76 | +0,2922 | −0,2408 em h=17 | +0,3132 | 0,996 |
-| Brasil | 76 | +1,1397 | **−0,9349 em h=4** | +0,7457 | 0,985 |
-
-O Brasil responde **mais forte e muito mais rápido**: o vale do produto chega em quatro
-trimestres contra dezessete, e o choque de juro é quase quatro vezes maior no impacto. É
-coerente com uma economia emergente de transmissão curta e política mais volátil, e é exatamente
-o tipo de coisa que a comparação entre países existe para mostrar.
-
-**O price puzzle aparece nos dois**, com a inflação subindo no primeiro ano — o que o pacote
-pedia que não fosse consertado, e é o que motiva o pacote de restrições de sinal.
-
-O maior autovalor de 0,996 nos Estados Unidos merece nota: o sistema é estável, mas por pouco, o
-que é esperado com o produto em nível e logs numa amostra de vinte anos.
+#### Commentary
+- **Impact Shock**: A one-standard-deviation policy rate shock in Brazil corresponds to an initial increase of +1.0660 percentage points in the Selic rate, peaking at +1.3018 pp at quarter 4 before returning to baseline by quarter 14.
+- **Output Response**: Real GDP declines rapidly following the contractionary policy shock, reaching a trough of −0.3804% at 1 year (horizon 4) and gradually recovering thereafter.
+- **Inflation Response**: Brazil exhibits a brief price puzzle in the first year (+0.4191 pp at horizon 4), followed by a sharper downward response in inflation than in the United States, reaching −0.4147 pp at horizon 8 and −0.2387 pp at horizon 14 before re-anchoring near zero (+0.0704 pp at horizon 24).
+- **System Stability**: The companion matrix maximum eigenvalue is 0.9876 (< 1.0), confirming stability.

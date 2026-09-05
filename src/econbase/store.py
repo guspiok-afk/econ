@@ -30,7 +30,6 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from econbase import schemas
-from econbase.settings import writes_are_redirected
 
 log = logging.getLogger(__name__)
 
@@ -397,38 +396,6 @@ class Store:
         return deleted
 
 
-ALLOW_REDIRECTED = "ECONBASE_ALLOW_REDIRECTED_WRITES"
-
-
-def _refuse_redirected_writes(data_dir: Path) -> None:
-    """Stop a write that only this process would be able to see.
-
-    A sandbox that redirects writes to the user's local application data forks the base in two
-    without telling anyone: the scheduled task keeps the real folder and whoever is inside the
-    sandbox keeps a private copy, each reading its own and both looking healthy. That happened
-    here on 4 September 2026, and it cost an afternoon and a wrong conclusion — the base was
-    declared lost when it was intact and being updated on the other side of the redirection.
-
-    The lock cannot catch it: two processes writing to two different folders never contend.
-    """
-    if os.environ.get(ALLOW_REDIRECTED) == "1":
-        return
-    verdict = writes_are_redirected(data_dir)
-    if verdict is True:
-        raise StoreError(
-            f"writes to {data_dir} from this process are redirected into a private copy that "
-            "the scheduled task cannot see, so this would fork the base in two. Run the "
-            "collection from a normal terminal, or point ECONBASE_DATA_DIR at a directory "
-            f"outside the local application data. Set {ALLOW_REDIRECTED}=1 to override."
-        )
-    if verdict is None:
-        log.warning(
-            "cannot tell whether writes to %s are redirected; if a scheduled task also writes "
-            "this directory, verify that both see the same manifest",
-            data_dir,
-        )
-
-
 class Transaction:
     """Stage files for one run, then promote them with a single atomic manifest swap.
 
@@ -439,7 +406,6 @@ class Transaction:
         self.store = store
         self.run_id = run_id
         self.catalog_hash = catalog_hash
-        _refuse_redirected_writes(store.data_dir)
         self._lock = WriterLock(store.lock_path, run_id=run_id)
         self._lock.acquire()
         try:

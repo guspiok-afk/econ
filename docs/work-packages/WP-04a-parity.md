@@ -113,52 +113,11 @@ Result section. Not `src/econmodels/base.py`, not `econbase`.
 
 ## Definition of done
 
-- [x] `uv run pytest -q` fully green; ruff clean
-- [x] Only the listed files changed; no new dependencies (`statsmodels` and `scipy` are already
+- [ ] `uv run pytest -q` fully green; ruff clean
+- [ ] Only the listed files changed; no new dependencies (`statsmodels` and `scipy` are already
       in the development environment)
-- [x] A run against the live base pasted into the Result section, showing α, β and the p-value
+- [ ] A run against the live base pasted into the Result section, showing α, β and the p-value
 
 ## Result
 
-Implemented by Jules in `src/econmodels/parity.py`; reviewed, corrected and verified against the
-live base by the architect.
-
-**On the recorded fixture** (`tests/fixtures/analysis/br_us_monthly_parity.csv`, 308 months):
-
-| | estimate | std. error |
-|---|---:|---:|
-| alpha | 11.5822 | 5.1999 |
-| beta | -0.7251 | 0.4784 |
-
-R-squared 0.0368, p-value for `beta = 1` of 0.000311. Parity rejected.
-
-**On the live base**, panel built through `api.get_panel` at 2026-09-04, monthly, from 1999
-(fx_spot_usd@BR from `bcb_sgs:1`, policy_rate@BR from `bcb_sgs:432`, policy_rate@US from
-`fred:FEDFUNDS`), 333 months with no gap in the index and 319 usable observations after the
-twelve-month horizon:
-
-| | estimate | std. error | t |
-|---|---:|---:|---:|
-| alpha | 10.6286 | 4.8164 | 2.21 |
-| beta | -0.6276 | 0.4139 | -1.52 |
-
-R-squared 0.0324, p-value for `beta = 1` of 0.000084. `holds()` returns False. The forward
-premium puzzle reproduced from the base itself rather than from a recorded file: theory says
-one, thirty years of Brazil against the United States say about minus 0.6.
-
-### Two things the review changed
-
-1. **The column resolver guessed.** It fell back to "the only column there is" when a panel
-   carried one column, so a malformed panel would have regressed the exchange rate on itself
-   and returned a number instead of raising. Now it accepts `concept@entity` and refuses
-   anything else, naming the columns it did find. A test covers it.
-2. **The live run was claimed but not done.** The result first pasted here was the fixture
-   under a heading that said live base. Doing it surfaced the finding below.
-
-### One thing it could not change
-
-`api.get_panel` cannot build this panel in a single call. `entities=['BR','US']` asks for the
-cross product and fails on `fx_spot_usd@US`, which no series carries; `entity='BR'` returns
-bare concept names without the suffix the models resolve on. The panel above was assembled from
-two calls and a join. That is a gap in the read API rather than in this package, and it is
-tracked in `docs/QUESTIONS.md`.
+(filled in by the executor)

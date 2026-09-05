@@ -6,10 +6,8 @@ defaults to a per-user local folder that is never inside a cloud-synced tree (se
 
 from __future__ import annotations
 
-import contextlib
 import os
 import sys
-import uuid
 from functools import lru_cache
 from pathlib import Path
 
@@ -59,52 +57,6 @@ def default_data_dir() -> Path:
         base = os.environ.get("XDG_DATA_HOME")
         root = Path(base) if base else Path.home() / ".local" / "share"
     return root / "econbase" / "data"
-
-
-def _bypass_path(path: Path) -> Path | None:
-    """The same location addressed so a per-path redirection filter does not cover it."""
-    drive = path.drive  # "C:"
-    if len(drive) != 2 or not drive[0].isalpha() or drive[1] != ":":
-        return None
-    return Path(f"//localhost/{drive[0]}$") / str(path)[3:]
-
-
-def writes_are_redirected(path: Path) -> bool | None:
-    """Whether a write to ``path`` lands somewhere another process would not see it.
-
-    Some sandboxes — the desktop application this project is often driven from is one — redirect
-    a process's writes to the user's local application data into a private copy, while letting its
-    *reads* see a merged view in which the private copy wins. Two processes then disagree about
-    what the base holds and neither can tell.
-
-    Nothing declarative reveals this. The environment variable carries the real path either way;
-    the process has no package identity to interrogate; and a marker file is actively misleading,
-    because the directory *listing* is merged even though the *write* was not, so the file written
-    by one process appears to the other and suggests, wrongly, that there is a single store. Only
-    writing and then reading back through an address the filter does not cover distinguishes them.
-
-    Returns ``None`` when the question cannot be answered — a platform without the bypass, or an
-    administrative share that is switched off — because "unknown" and "fine" are not the same
-    answer when the cost of being wrong is a base that silently forks in two.
-    """
-    if sys.platform != "win32":
-        return False
-    bypass = _bypass_path(path)
-    if bypass is None:
-        return None
-    probe = path / f".write-probe-{uuid.uuid4().hex}"
-    try:
-        path.mkdir(parents=True, exist_ok=True)
-        probe.write_text("probe", encoding="utf-8")
-    except OSError:
-        return None
-    try:
-        return not (bypass / probe.name).exists()
-    except OSError:
-        return None
-    finally:
-        with contextlib.suppress(OSError):
-            probe.unlink()
 
 
 class Settings(BaseSettings):

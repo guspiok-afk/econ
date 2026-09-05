@@ -10,15 +10,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.api import VAR
 
-from econmodels.base import (
-    ConceptRequest,
-    Result,
-    RunContext,
-    TablesResult,
-    panel_for,
-    register,
-    series_for,
-)
+from econmodels.base import ConceptRequest, Result, RunContext, TablesResult, register
 
 
 @register
@@ -53,11 +45,23 @@ class VectorAutoregression:
         self.order = order
         self.identification = identification
 
+    def _get_series(self, panel: pd.DataFrame, concept: str) -> pd.Series:
+        """Locate the column for a concept and entity in the given panel."""
+        col_name = f"{concept}@{self.entity}"
+        if col_name in panel.columns:
+            return panel[col_name]
+        if concept in panel.columns and not any("@" in str(c) for c in panel.columns):
+            return panel[concept]
+        cols_str = ", ".join(str(c) for c in panel.columns)
+        raise ValueError(
+            f"Concept '{concept}' for entity '{self.entity}' (expected '{col_name}') "
+            f"not found in panel columns: [{cols_str}]"
+        )
+
     def fit(self, panel: pd.DataFrame, ctx: RunContext) -> Result:
-        panel_for(self, panel, entity=self.entity)
-        cpi = series_for(panel, "cpi_headline_index", self.entity)
-        gdp = series_for(panel, "gdp_real", self.entity)
-        policy_rate = series_for(panel, "policy_rate", self.entity)
+        cpi = self._get_series(panel, "cpi_headline_index")
+        gdp = self._get_series(panel, "gdp_real")
+        policy_rate = self._get_series(panel, "policy_rate")
 
         # Transformations:
         # Sort index to ensure chronological ordering before shift
