@@ -137,6 +137,33 @@ def check(
 
 
 @app.command()
+def report(
+    out: Annotated[Path, typer.Option(help="Where to write the page.")] = Path(
+        "econbase-report.html"
+    ),
+    catalog: CatalogOpt = Path("catalog"),
+    redistributable_only: Annotated[
+        bool,
+        typer.Option(
+            help="Leave out the values of series the catalog marks as not redistributable."
+        ),
+    ] = False,
+) -> None:
+    """One self-contained page: every series, its chart, and what is worth a look."""
+    from econbase import report as report_module
+
+    settings = get_settings()
+    path = report_module.build(
+        _store(settings),
+        _catalog(catalog),
+        out,
+        redistributable_only=redistributable_only,
+    )
+    size = path.stat().st_size / 1024
+    typer.echo(f"escrito: {path}  ({size:,.0f} KB)")
+
+
+@app.command()
 def update(
     catalog: CatalogOpt = Path("catalog"),
     source: Annotated[list[str] | None, typer.Option(help="Only these sources.")] = None,

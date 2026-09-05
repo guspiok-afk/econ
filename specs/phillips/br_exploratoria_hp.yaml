@@ -1,0 +1,35 @@
+# Controle negativo, mantido de propósito. Foi a primeira tentativa, feita antes de procurar a
+# especificação publicada, e erra de maneiras conhecidas — é isso que ela documenta.
+spec_id: br_exploratoria_hp
+model_id: phillips
+version: "1"
+entity: BR
+
+provenance:
+  follows: >
+    Nenhuma fonte. Especificação exploratória escrita em cinco minutos para ver se a base
+    sustentava o pacote, mantida como controle negativo.
+  departs: >
+    Sem repasse cambial, o que numa economia aberta é omissão de variável relevante e
+    correlacionada com a folga. Sem restrição de verticalidade, e a soma dos coeficientes de
+    inflação dá 2,42 — o que viola a verticalidade de longo prazo e é sintoma de equação mal
+    posta, não achado. Inflação cheia em vez de livres, misturando um bloco que responde a folga
+    com um quarto do índice reajustado por regra institucional.
+
+dependent:
+  concept: cpi_headline
+  transform: annualised_quarterly
+
+terms:
+  - {name: expectativa, concept: inflation_expectations_12m, lags: [0]}
+  - {name: inercia, concept: cpi_headline, transform: annualised_quarterly, lags: [1]}
+  - {name: folga, concept: unemployment_rate, transform: hp_gap, lags: [0]}
+
+restrictions: []
+estimation: {method: ols, cov: newey_west, maxlags: 4}
+sample: {start: "2012-04-01"}
+
+notes: >
+  Começa em 2012 porque a PNAD Contínua começa em março de 2012 — 57 trimestres, dos quais uma
+  dezena contaminados pela pandemia. É pouco para separar folga de choque, e faz parte do que
+  esta especificação existe para mostrar.

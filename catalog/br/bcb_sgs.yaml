@@ -201,3 +201,40 @@ series:
     freq: M
     expected_lag_days: 25
     source_url: https://www3.bcb.gov.br/sgspub/
+
+  # The decomposition of the IPCA the Banco Central publishes and uses in its own semi-structural
+  # model. The titles below are ours, descriptive: unlike the fourteen above, these four were not
+  # verified against the Bank's published names, which the open-data portal did not return. What
+  # was verified is stronger — the arithmetic identity, in tests/test_br_decomposition.py:
+  # headline = 0.838 x free + 0.161 x administered, weights summing to 0.999.
+  - native_id: '11428'
+    concept_id: cpi_free
+    title: IPCA free prices, monthly change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '4449'
+    concept_id: cpi_administered
+    title: IPCA administered prices, monthly change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '10844'
+    concept_id: cpi_services
+    title: IPCA services, monthly change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/
+
+  - native_id: '4447'
+    concept_id: cpi_tradables
+    title: IPCA tradable goods, monthly change
+    unit: pct
+    freq: M
+    expected_lag_days: 12
+    source_url: https://www3.bcb.gov.br/sgspub/

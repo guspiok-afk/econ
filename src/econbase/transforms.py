@@ -77,12 +77,27 @@ def _as_frame(series: pd.Series) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------- frequency
+def _compound(values: pd.Series) -> float:
+    """Chain period rates of change, in percent, into the rate for the whole period."""
+    present = values.dropna()
+    if present.empty:
+        return float("nan")
+    return float(((1.0 + present / 100.0).prod() - 1.0) * 100.0)
+
+
 def resample(frame: pd.DataFrame, *, from_freq: str, to_freq: str, agg: str) -> pd.DataFrame:
     """Convert a ``period``/``value`` frame to a coarser frequency.
 
-    ``agg`` is one of ``last``, ``eop``, ``mean``, ``sum``. ``last`` and ``eop`` both take the
-    final observation of the period; they differ only for strictly regular data, which economic
-    series rarely are, so they are kept as synonyms rather than as a false distinction.
+    ``agg`` is one of ``last``, ``eop``, ``mean``, ``sum``, ``compound``. ``last`` and ``eop``
+    both take the final observation of the period; they differ only for strictly regular data,
+    which economic series rarely are, so they are kept as synonyms rather than as a false
+    distinction.
+
+    ``compound`` is the one that is not interchangeable with its neighbours. A series of period
+    rates of change does not add: twelve months at 0.5 per cent make 6.17 per cent, not 6.00,
+    and the gap widens with the rate — at Brazil's 2002 inflation it passes half a point. Rates
+    of change take ``compound``; flows take ``sum``; levels and rates per annum take ``mean``,
+    ``last`` or ``eop``.
     """
     _check_freq(from_freq)
     _check_freq(to_freq)
@@ -103,8 +118,10 @@ def resample(frame: pd.DataFrame, *, from_freq: str, to_freq: str, agg: str) -> 
         out = grouper.mean()
     elif agg == "sum":
         out = grouper.sum(min_count=1)
+    elif agg == "compound":
+        out = grouper.apply(_compound)
     else:
-        raise TransformError(f"unknown aggregation {agg!r}; use last, eop, mean or sum")
+        raise TransformError(f"unknown aggregation {agg!r}; use last, eop, mean, sum or compound")
     return _as_frame(out.dropna(how="all"))
 
 

@@ -57,7 +57,7 @@ executors:
 
 interfaces:
   - kind: parquet
-    path: "%LOCALAPPDATA%\econbase\data\lake"
+    path: '%LOCALAPPDATA%\econbase\data\lake'
     stability: stable
     note: fonte da verdade; o arquivo DuckDB é cache reconstruível
   - kind: python

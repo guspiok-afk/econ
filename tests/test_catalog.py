@@ -107,3 +107,20 @@ def test_tables_conform_to_contract(catalog: Catalog) -> None:
     assert et.schema.equals(schemas.ENTITIES)
     assert set(et.column("entity_id").to_pylist()) == {"BR", "US"}
     assert EntitySpec(entity_id="US", entity_type="country", name="US").attributes == {}
+
+
+def test_the_literals_here_match_the_tuples_in_schemas() -> None:
+    """The same vocabulary is written twice, so it can drift; this is what notices.
+
+    `schemas` holds the runtime tuples and `catalog` holds the pydantic literals, because a
+    Literal cannot be built from a tuple at runtime. When `compound` was added to the
+    aggregations it reached only one of the two, and every catalog using it stopped loading.
+    """
+    from typing import get_args
+
+    from econbase import catalog as cat
+    from econbase import schemas as sch
+
+    assert set(get_args(cat.Aggregation)) == set(sch.AGGREGATIONS)
+    assert set(get_args(cat.Frequency)) == set(sch.FREQUENCIES)
+    assert set(get_args(cat.EntityType)) == set(sch.ENTITY_TYPES)
