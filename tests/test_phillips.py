@@ -28,9 +28,8 @@ import pytest
 pytest.importorskip("econmodels.specs", reason="WP-04c depends on the specification loader")
 pytest.importorskip("econmodels.phillips", reason="WP-04c not implemented yet")
 
-from econmodels.phillips import PhillipsCurve
-
 from econmodels.base import PanelError, RunContext
+from econmodels.phillips import PhillipsCurve
 from econmodels.specs import load_specs
 
 ROOT = Path(__file__).resolve().parents[1]
