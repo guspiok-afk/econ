@@ -19,7 +19,7 @@ FREQUENCIES: tuple[str, ...] = ("D", "B", "W", "M", "Q", "A")
 ENTITY_TYPES: tuple[str, ...] = ("country", "instrument", "issuer", "index", "region")
 RUN_STATUSES: tuple[str, ...] = ("ok", "partial", "failed")
 TRIGGERS: tuple[str, ...] = ("manual", "scheduler", "ci")
-AGGREGATIONS: tuple[str, ...] = ("last", "mean", "sum", "eop", "compound")
+AGGREGATIONS: tuple[str, ...] = ("last", "mean", "sum", "eop")
 
 _TS_UTC = pa.timestamp("us", tz="UTC")
 
@@ -115,41 +115,6 @@ RAW_INDEX = pa.schema(
     ]
 )
 
-MODEL_RUNS = pa.schema(
-    [
-        pa.field("model_run_id", pa.string(), nullable=False),
-        pa.field("model_id", pa.string(), nullable=False),
-        pa.field("model_version", pa.string(), nullable=False),
-        pa.field("entity_id", pa.string(), nullable=True),
-        pa.field("asof", pa.date32(), nullable=False),
-        pa.field("seed", pa.int64(), nullable=False),
-        pa.field("vintage_kind", pa.string(), nullable=False),
-        pa.field("spec_id", pa.string(), nullable=True),
-        # The content of the specification file, so a run stays reproducible when the file
-        # is later edited. Without it an edit silently re-labels every earlier run.
-        pa.field("spec_hash", pa.string(), nullable=True),
-        pa.field("params", pa.string(), nullable=True),  # JSON, so a rerun is reconstructible
-        pa.field("git_sha", pa.string(), nullable=True),
-        pa.field("package_version", pa.string(), nullable=True),
-        pa.field("catalog_hash", pa.string(), nullable=True),
-        pa.field("created_at", _TS_UTC, nullable=False),
-    ]
-)
-
-#: Every table a model returns, melted. Wide storage would need a migration per analysis, and
-#: the analyses do not agree on a shape: a coefficient table has names, an impulse response has
-#: horizons, a fitted table has periods.
-MODEL_OUTPUTS = pa.schema(
-    [
-        pa.field("model_run_id", pa.string(), nullable=False),
-        pa.field("table_name", pa.string(), nullable=False),
-        pa.field("row_ix", pa.int32(), nullable=False),
-        pa.field("column_name", pa.string(), nullable=False),
-        pa.field("value_num", pa.float64(), nullable=True),
-        pa.field("value_txt", pa.string(), nullable=True),
-    ]
-)
-
 TABLES: dict[str, pa.Schema] = {
     "observations": OBSERVATIONS,
     "series": SERIES,
@@ -157,8 +122,6 @@ TABLES: dict[str, pa.Schema] = {
     "runs": RUNS,
     "run_series": RUN_SERIES,
     "raw_index": RAW_INDEX,
-    "model_runs": MODEL_RUNS,
-    "model_outputs": MODEL_OUTPUTS,
 }
 
 #: Tables whose files are partitioned by a column value in the path (``table/col=value/``).

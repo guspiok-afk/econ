@@ -71,7 +71,3 @@ bcb_sgs:21085
 bcb_sgs:22707
 bcb_sgs:22708
 bcb_sgs:22701
-bcb_sgs:11428
-bcb_sgs:4449
-bcb_sgs:10844
-bcb_sgs:4447

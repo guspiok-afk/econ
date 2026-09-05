@@ -116,54 +116,14 @@ execução foi a primeira.
 uv run python -m econbase.cli check
 ```
 
-Em 04/09/2026 a base pareceu vazia por este teste. **A causa esta estabelecida e nao era perda de
-dado:** a coleta rodava dentro do aplicativo e lia a copia privada, enquanto a base de verdade
-seguia intacta e sendo atualizada pelo agendador. Antes de concluir qualquer coisa a partir de
-uma base que parece vazia, confira em qual delas voce esta — a secao seguinte diz como.
+Em 04/09/2026 a base foi encontrada com uma única execução gravada e apenas a fonte `bcb_sgs`,
+enquanto a pasta de backup estava vazia. A causa não ficou estabelecida. A resposta é a mesma em
+qualquer caso: rodar `update` completo, e só confiar no backup depois de vê-lo cheio.
 
-## Duas bases, e como saber em qual você está
+## O caminho de dados visto de dentro do aplicativo
 
-**Este é o achado que custou uma tarde e uma conclusão errada em 04/09/2026.**
-
-Dentro do aplicativo de desktop — e portanto em tudo que o Claude Code executa — as escritas em
-`%LOCALAPPDATA%` são **desviadas para uma cópia privada**, enquanto as leituras enxergam uma
-visão mesclada em que a cópia privada ganha. O agendador escreve a pasta de verdade; o agente
-dentro do aplicativo escreve a sombra. Cada lado lê a sua, e as duas parecem saudáveis.
-
-**Nada declarativo revela isso.** A variável de ambiente traz o caminho real dos dois lados. O
-processo não tem identidade de pacote para interrogar. E um arquivo-marcador é pior que inútil:
-a *listagem* do diretório é mesclada mesmo quando a *escrita* não foi, então o arquivo escrito
-por um processo aparece para o outro e sugere, erradamente, que há uma base só. Foi exatamente
-assim que eu me convenci do contrário e escrevi aqui o oposto da verdade.
-
-O único teste que separa as duas é escrever e reler por um endereço que o desvio não cobre:
-
-```powershell
-$local = Join-Path $env:LOCALAPPDATA 'econbase\data\lake\manifest.json'
-$real  = '\\localhost\c$' + $local.Substring(2)
-(Get-Content $local -Raw | ConvertFrom-Json).run_id
-(Get-Content $real  -Raw | ConvertFrom-Json).run_id
-```
-
-**`run_id` diferentes significam duas bases.** A de verdade é a do caminho UNC, e é a que o
-backup no Drive copia.
-
-### O que o código faz a respeito
-
-Toda transação de escrita roda a sonda antes de pegar o lock e **recusa** quando a escrita seria
-desviada. O lock não pega esse caso: dois processos escrevendo pastas diferentes nunca disputam.
-
-```
-StoreError: writes to ...\econbase\data from this process are redirected into a
-private copy that the scheduled task cannot see, so this would fork the base in two.
-```
-
-Se você vir isso, colete **do seu terminal**, não de dentro do aplicativo. Para forçar mesmo
-assim — inspeção, teste —, use `ECONBASE_ALLOW_REDIRECTED_WRITES=1`, ciente de que o resultado
-some para todo o resto do sistema.
-
-### Se quiser as duas pontas na mesma base
-
-Aponte `ECONBASE_DATA_DIR` para um caminho **fora** de `AppData\Local` — por exemplo
-`C:\dados\econbase`. O desvio não alcança lá, e o `.env` do repositório principal é lido também
-pelas árvores de trabalho, então basta escrever uma vez.
+Dentro do aplicativo de desktop, o Python enxerga `%LOCALAPPDATA%` como
+`...\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local`. É um apelido do contêiner para a mesma
+pasta: um arquivo escrito por um caminho aparece no outro. **Não são duas bases, é uma só.** O
+`data_dir` que o `settings` imprime nesse contexto assusta e não significa que a coleta foi para
+outro lugar.

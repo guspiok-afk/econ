@@ -33,11 +33,8 @@ SERIES_ID_RE = re.compile(r"^[a-z][a-z0-9_]*:[A-Za-z0-9][A-Za-z0-9_./\-]*$")
 CONCEPT_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 ENTITY_RE = re.compile(r"^[A-Z]{2}$|^[a-z][a-z0-9_]*:[A-Za-z0-9._\-]+$")
 
-# These mirror the tuples in `schemas`, which cannot be spelled as a Literal at runtime.
-# `tests/test_catalog.py` fails the moment the two drift, which is how `compound` was found
-# missing here after being added there.
 Frequency = Literal["D", "B", "W", "M", "Q", "A"]
-Aggregation = Literal["last", "mean", "sum", "eop", "compound"]
+Aggregation = Literal["last", "mean", "sum", "eop"]
 EntityType = Literal["country", "instrument", "issuer", "index", "region"]
 
 

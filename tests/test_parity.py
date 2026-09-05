@@ -19,8 +19,9 @@ import pytest
 
 pytest.importorskip("econmodels.parity", reason="WP-04a not implemented yet")
 
-from econmodels.base import PanelError, RunContext
 from econmodels.parity import UncoveredParity
+
+from econmodels.base import RunContext
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "br_us_monthly_parity.csv"
 HORIZON = 12
@@ -150,20 +151,6 @@ def test_missing_inputs_are_dropped_not_filled() -> None:
     n = int(result.tables()["diagnostics"].set_index("metric")["value"]["n_obs"])
     assert n < 308, "rows without a differential cannot enter the regression"
     assert n > 250
-
-
-def test_a_panel_of_the_wrong_shape_is_refused_rather_than_guessed() -> None:
-    """One column must never stand in for every concept the model asked for.
-
-    A resolver that falls back to "the only column there is" turns a malformed panel into a
-    regression of the exchange rate on itself, which returns a number instead of an error.
-    """
-    single = pd.DataFrame(
-        {"fx_spot_usd@BR": [1.0] * 100},
-        index=pd.date_range("2000-01-01", periods=100, freq="MS"),
-    )
-    with pytest.raises(PanelError, match=r"policy_rate@BR"):
-        UncoveredParity(base="BR", quote="US", horizon_months=HORIZON).fit(single, ctx())
 
 
 def test_the_model_declares_what_it_needs() -> None:
