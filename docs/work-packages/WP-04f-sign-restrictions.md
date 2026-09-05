@@ -63,7 +63,7 @@ class SignRestrictedVAR:
         horizon: int = 20,
         restrict_through: int = 3,
         draws: int = 2000,
-        signs: dict[str, int] | None = None,   # padrão: policy +1, output -1, inflation -1
+        signs: dict[str, int] | None = None,  # padrão: policy +1, output -1, inflation -1
         bands: tuple[float, float] = (16.0, 84.0),
     ) -> None: ...
 
@@ -132,4 +132,49 @@ Se um teste parecer errado, diga no pull request em vez de mudá-lo.
 
 ## Resultado
 
-(preenchido pelo executor)
+Implementado e verificado pelo arquiteto, depois de o pacote ficar sem executor disponível.
+
+### Uma correção no meu próprio teste
+
+Eu havia escrito que pedir um choque que **sobe** juro, produto e inflação ao mesmo tempo
+esvaziaria o conjunto identificado. Não esvazia — esse choque existe, e parece demanda. Medir em
+vez de supor deu um fato melhor, e ele virou o teste que substituiu aquele:
+
+| restrição imposta até | aceitos (500 sorteios) | taxa |
+|---:|---:|---:|
+| h=3 | 61 | 2,03% |
+| h=8 | 37 | 1,23% |
+| h=12 | 16 | 0,53% |
+| h=19 | 4 | **0,13%** |
+
+**O conjunto nunca esvazia**, nem impondo os sinais por vinte trimestres. As restrições apertam
+muito sem apertar até o vazio, e é a taxa de aceitação que deixa o leitor ver isso — por isso ela
+é obrigatória no diagnóstico.
+
+A recusa quando o conjunto é vazio continua testada, por um caminho que a garante.
+
+### Na fixture, 1961T1 a 2019T4
+
+| horizonte | inflação | produto | juro |
+|---:|---:|---:|---:|
+| 0 | −0,3075 | −0,2298 | +0,4371 |
+| 4 | **−0,1427** | −0,2902 | +0,1194 |
+| 8 | −0,1648 | −0,2613 | +0,0055 |
+| 20 | −0,0672 | −0,1432 | −0,0486 |
+
+**O price puzzle desaparece** — máximo de −0,14 no primeiro ano contra **+0,3779** do Cholesky — e
+continua ausente em h=8, 12 e 20, onde nada o proíbe. É a afirmação que vale, e é a que o teste
+cobra.
+
+### Ao vivo, 1999–2019, os dois países
+
+| | aceitos | taxa | inflação h1–h4 | produto | juro no impacto |
+|---|---:|---:|---:|---:|---:|
+| Estados Unidos | 321 / 12.000 | 2,67% | **+0,1245** | −0,3851 em h=1 | +0,0461 |
+| Brasil | 339 / 12.000 | 2,83% | **−0,1755** | −0,9154 em h=0 | +0,3690 |
+
+Vale registrar a discordância em vez de escondê-la: na amostra curta americana o puzzle **não
+some**, só encolhe — de +0,38 para +0,12. Na amostra longa da fixture ele some. Vinte anos de
+dados não sustentam a identificação tão bem quanto sessenta, e essa é a leitura honesta.
+
+No Brasil ele some, e o produto cai quase um por cento já no impacto.

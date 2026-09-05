@@ -25,9 +25,8 @@ import pytest
 
 pytest.importorskip("econmodels.sign_restrictions", reason="WP-04f not implemented yet")
 
-from econmodels.sign_restrictions import SignRestrictedVAR
-
 from econmodels.base import PanelError, RunContext
+from econmodels.sign_restrictions import SignRestrictedVAR
 from econmodels.var import VectorAutoregression
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "us_quarterly_var.csv"
@@ -173,17 +172,36 @@ def test_a_different_seed_gives_a_different_set() -> None:
     assert not a.tables()["irf"]["median"].equals(b.tables()["irf"]["median"])
 
 
-def test_restrictions_nothing_can_satisfy_are_refused_rather_than_returned_empty() -> None:
-    """Asking for a shock that raises the rate and raises output is a question, not a bug — but
-    it must come back as a refusal and not as an empty table nobody notices."""
-    with pytest.raises(ValueError, match=r"(?i)no rotation|accepted|satisfies"):
-        SignRestrictedVAR(
-            entity="US",
-            lags=4,
-            horizon=8,
-            draws=200,
-            signs={"policy": 1, "output": 1, "inflation": 1},
-        ).fit(us_panel(), ctx())
+def test_an_empty_identified_set_is_a_refusal_and_not_an_empty_table() -> None:
+    """Zero survivors has to raise. An empty table is the failure mode nobody notices."""
+    with pytest.raises(ValueError, match=r"(?i)no rotation|satisfies"):
+        SignRestrictedVAR(entity="US", lags=4, horizon=8, draws=0).fit(us_panel(), ctx())
+
+
+def test_the_set_survives_even_a_five_year_restriction_and_the_rate_records_the_cost() -> None:
+    """Written after the test that replaced it was wrong about the data.
+
+    I first asserted that asking for a shock which raises the rate, output and inflation together
+    would empty the set. It does not — such a shock exists, and it looks like demand. Measuring
+    instead of assuming gives a better fact: imposing the policy signs for twenty quarters still
+    leaves survivors, and the acceptance rate falls from about two per cent to one in eight
+    hundred. The restrictions bind hard without binding to nothing, and the rate is how a reader
+    sees that.
+    """
+    loose = SignRestrictedVAR(entity="US", lags=4, horizon=20, restrict_through=3, draws=500).fit(
+        us_panel(), ctx()
+    )
+    tight = SignRestrictedVAR(entity="US", lags=4, horizon=20, restrict_through=19, draws=500).fit(
+        us_panel(), ctx()
+    )
+
+    def rate(result) -> float:
+        return float(result.tables()["diagnostics"].set_index("metric")["value"]["acceptance_rate"])
+
+    assert rate(tight) < rate(loose) / 5, (
+        "a five-year restriction must cost far more than a one-year one"
+    )
+    assert rate(tight) > 0, "and it must still leave an identified set"
 
 
 def test_a_monthly_panel_is_refused_before_any_arithmetic() -> None:
