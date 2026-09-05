@@ -20,11 +20,36 @@ goal: >
 phases:
   - {id: "01", title: "Fundação: contrato, armazenamento, pipeline bitemporal", state: done}
   - {id: "02", title: "Conectores e catálogo", state: done}
-  - {id: "03", title: "Transformações, API e automação", state: active}
-  - {id: "04", title: "Análises tier 1", state: todo}
-  - {id: "05", title: "Nowcasting e índices", state: todo}
+  - {id: "03", title: "Transformações, API e automação", state: done}
+  - {id: "04", title: "Análises tier 1", state: done}
+  - {id: "05", title: "Nowcasting e índices", state: active}
   - {id: "06", title: "DSGE", state: todo}
   - {id: "07", title: "Preços de ativos (projeto irmão, mesmo repositório)", state: todo}
+  - {id: "08", title: "Interface funcional sobre a base e os modelos", state: todo}
+
+delivered:
+  window: 2026-09-03 a 2026-09-05 (3 dias corridos)
+  merged_prs: 31
+  tests: 604
+  series: 73          # BR 42, US 30, global 1; 33 não redistribuíveis
+  models: 8           # phillips, taylor, parity, var, sign_restrictions, local_projections, dfm, results
+  adrs: 7
+  work_packages: 17
+  specs: 2
+  note: >
+    Fases 1 a 4 fechadas e a 5 aberta. As horas do plano eram de um desenvolvedor só; a execução
+    saiu comprimida porque vários agentes rodam em paralelo. O gargalo passou a ser revisão e
+    verificação ao vivo, não escrita de código.
+
+blockers:
+  - id: C1
+    title: O PIB brasileiro do catálogo não é dessazonalizado
+    detail: >
+      sidra:1620/583 declara seasonal_adj true e não é (dummies de trimestre explicam 55,3% do
+      crescimento, contra 0,7% nos EUA). Afeta gdp_real@BR em taylor, var, local_projections e
+      sign_restrictions. Três opções em docs/QUESTIONS.md; a decisão é do mantenedor.
+    waiting_on: human
+    since: 2026-09-05
 
 decisions:
   - question: Adotar Julia para o módulo DSGE?
@@ -43,6 +68,14 @@ decisions:
     answer: Só o agendador local. A integração contínua roda testes e nunca grava dados.
     reopen_when: Surgir um leitor remoto ou um aplicativo hospedado.
 
+  - question: O que um nowcast tem de provar para entrar?
+    answer: >
+      Ganho medido contra a média incondicional na amostra completa, e a derrota no período
+      calmo afirmada por teste junto. O ganho do fator dinâmico vem do choque comum: 0,77 contra
+      2,05 em 2018-2025, 0,49 contra 0,42 em 2022-2025. Nenhum dos dois números circula sozinho.
+    reopen_when: >
+      Um alvo com sazonalidade tratada e história mais longa no Brasil mudar o quadro.
+
   - question: Guardar histórico de revisões desde o início?
     answer: >
       Sim. Já provou o valor: o desemprego americano de abril de 2020 foi publicado em 14,7% e
@@ -51,7 +84,7 @@ decisions:
 
 executors:
   - {name: "agent:claude", validated: true, notes: "arquiteto e integrador"}
-  - {name: "agent:jules", validated: true, notes: "WP-02b, conectores do Banco Central"}
+  - {name: "agent:jules", validated: true, notes: "WP-02b; não entregou WP-04e/04f, feitos por Claude"}
   - {name: "agent:antigravity", validated: true, notes: "WP-02c e WP-02d"}
   - {name: "agent:ollama", validated: true, notes: "WP-02e; acerta conteúdo, erra formato"}
 
