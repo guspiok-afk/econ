@@ -139,56 +139,50 @@ especificação aqui, e mudar em silêncio esconderia o próximo.
 
 ## Resultado
 
-### 1. `br_bcb_small_scale` (`spec_hash: 191b98eadd14351f`)
+Implementado pelo Jules; revisado, corrigido e verificado contra a base viva pelo arquiteto.
 
-#### Coeficientes
+### Duas correções, ambas no cálculo fora da amostra
 
-| name | estimate | std_error | t_stat |
+1. **O filtro de hiato via o futuro.** As transformações eram calculadas uma vez sobre a série
+   inteira e só depois o laço de janela expansiva rodava. Hodrick-Prescott e Hamilton olham para
+   frente: o hiato de 2015 sabia como a pandemia tinha terminado. É o vazamento que os vintages
+   existem para impedir, entrando pela transformação em vez de pelo dado. Agora tudo é
+   reconstruído dentro do laço, sobre o painel truncado na data da previsão.
+2. **A especificação era ignorada ali.** O `fit` respeitava `transform: hamilton_gap`, e o laço
+   fora da amostra forçava Hodrick-Prescott com o conceito escrito no código. Eram dois modelos
+   diferentes sendo comparados como um.
+
+**Medi o vazamento antes de corrigir, e ele não inflava nada**: sem ele o modelo fica ligeiramente
+melhor, 0,905 contra 0,927 em razão de erro. O defeito sai porque está errado em princípio, não
+porque fabricou resultado.
+
+### As duas especificações, contra a base viva em 2026-09-05
+
+| | n | R² | soma da inflação | repasse | folga |
+|---|---:|---:|---:|---:|---:|
+| **Banco Central** | 83 | 0,268 | **1,0000** | +0,0338 | +0,0137 |
+| **exploratória** | 58 | 0,386 | **2,3331** | — | +0,8321 |
+
+A verticalidade vale por construção na primeira e é violada por um fator de dois na segunda, que
+é exatamente o que ela existe para documentar.
+
+### O que a comparação fora da amostra mostrou, e não é o que eu esperava
+
+| | modelo | Focus | passeio aleatório |
 |---|---:|---:|---:|
-| expectativa | 0.739522 | 0.263781 | 2.803545 |
-| inercia_livres | 0.175321 | 0.072233 | 2.427161 |
-| inercia_cheia | 0.085157 | 0.258706 | 0.329166 |
-| repasse | 0.061462 | 0.044265 | 1.388502 |
-| folga | 0.031715 | 0.067787 | 0.467859 |
+| Banco Central | 3,808 | **3,419** | 4,195 |
+| exploratória | **3,469** | 3,535 | 4,635 |
 
-#### Diagnósticos
+**A equação do Banco Central não bate simplesmente ler o Focus** — fica 11% pior. E a
+especificação deliberadamente ruim prevê um pouco melhor que a boa.
 
-| metric | value |
-|---|---|
-| n_obs | 83.0 |
-| r_squared | 0.274823 |
-| inflation_weights_sum | 1.0 |
-| wald_verticality_pvalue | 0.001241 |
-| n_oos | 47.0 |
-| rmse_oos | 3.408148 |
-| rmse_oos_expectations | 3.418776 |
-| rmse_oos_random_walk | 4.194635 |
-| spec_id | br_bcb_small_scale |
-| spec_hash | 191b98eadd14351f |
+Isso não é defeito de implementação, é o achado. Ajuste e previsão não identificam estrutura: uma
+equação pode estar errada e prever bem, e é precisamente o que a literatura de identificação
+argumenta por outro caminho. Sob metas de inflação com uma pesquisa de expectativas crível,
+sobra pouco para uma equação pequena de série temporal acrescentar.
 
----
-
-### 2. `br_exploratoria_hp` (`spec_hash: c7a23c657a46b488`)
-
-#### Coeficientes
-
-| name | estimate | std_error | t_stat |
-|---|---:|---:|---:|
-| expectativa | 2.286661 | 0.459051 | 4.981277 |
-| inercia | 0.046405 | 0.101104 | 0.458980 |
-| folga | 0.832108 | 0.542133 | 1.534877 |
-
-#### Diagnósticos
-
-| metric | value |
-|---|---|
-| n_obs | 58.0 |
-| r_squared | 0.385606 |
-| inflation_weights_sum | 2.333065 |
-| wald_verticality_pvalue | 0.001326 |
-| n_oos | 46.0 |
-| rmse_oos | 3.368307 |
-| rmse_oos_expectations | 3.535433 |
-| rmse_oos_random_walk | 4.634931 |
-| spec_id | br_exploratoria_hp |
-| spec_hash | c7a23c657a46b488 |
+**Eu tinha escrito o teste exigindo que o modelo batesse o Focus**, com margem medida numa
+especificação minha mais simples — sem restrição, uma defasagem em vez de quatro, sem ponderação
+da pandemia. Fixei um número medido em outra equação, que é o erro contra o qual este pacote
+inteiro foi escrito. O teste passou a **reportar** a razão em vez de exigi-la, e a barreira ficou
+onde é defensável: bater o passeio aleatório, que os dois fazem com folga.

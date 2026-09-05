@@ -319,38 +319,30 @@ class PhillipsCurve:
     def _compute_oos_metrics(
         self, panel: pd.DataFrame, reg_data_full: pd.DataFrame
     ) -> tuple[int, float, float, float]:
-        """Expanding window pseudo-out-of-sample forecast evaluation from 2015-01-01."""
-        default_entity = self.spec.entity
-        dep_s = series_for(
-            panel,
-            self.spec.dependent.concept,
-            self.spec.dependent.entity or default_entity,
-        )
-        dep_transformed = _apply_transform(dep_s, self.spec.dependent.transform)
+        """Expanding-window pseudo-out-of-sample evaluation from 2015Q1.
 
-        terms_dict: dict[str, pd.Series] = {}
-        for term in self.spec.terms:
-            s = series_for(panel, term.concept, term.entity or default_entity)
-            if term.concept == "activity_index":
-                s_trans = _hp_gap(s)
-            else:
-                s_trans = _apply_transform(s, term.transform)
-            if len(term.lags) == 1:
-                t_series = s_trans.shift(term.lags[0])
-            else:
-                t_series = pd.concat([s_trans.shift(lag) for lag in term.lags], axis=1).mean(axis=1)
-            terms_dict[term.name] = t_series
+        Every transformation is recomputed inside the loop, on the panel truncated at the
+        forecast date. That matters because the slack term is a filter: Hodrick-Prescott and
+        Hamilton both look forward, so a gap computed once over the whole sample and then read at
+        2015 knows how the pandemic turned out. It is the leakage the vintages exist to prevent,
+        arriving through the transformation rather than through the data.
 
-        reg_data = pd.DataFrame({"Y": dep_transformed, **terms_dict})
-        if self.spec.sample.start:
-            reg_data = reg_data[reg_data.index >= pd.Timestamp(self.spec.sample.start)]
+        Measured on this fixture it does not flatter the model — the honest version scores
+        slightly better, 0.905 against 0.927 relative to the survey — but that is a fact about
+        this sample and not a reason to keep it.
 
-        eval_dates = reg_data[reg_data.index >= pd.Timestamp("2015-01-01")].index
+        The truncation is at the forecast date rather than the one before it, so a filtered term
+        lagged one quarter is estimated from data through the quarter being forecast. The survey
+        term needs that, being observed before the inflation it anticipates; for the gap it is a
+        one-quarter convention, stated here rather than hidden.
+        """
+        eval_dates = reg_data_full[reg_data_full.index >= pd.Timestamp("2015-01-01")].index
 
         errs_model: list[float] = []
         errs_exp: list[float] = []
         errs_rw: list[float] = []
 
+        reg_data = reg_data_full
         exp_term = None
         first_lag_term = None
         for t in self.spec.terms:
@@ -365,6 +357,13 @@ class PhillipsCurve:
             first_lag_term = exp_term
 
         for t in eval_dates:
+            # o painel como ele existia na data da previsao: nada depois de t entra em
+            # transformacao nenhuma, filtro incluido
+            dep_t, terms_t = self._build_transformed_series(panel.loc[:t])
+            reg_data = pd.DataFrame({"Y": dep_t, **terms_t})
+            if self.spec.sample.start:
+                reg_data = reg_data[reg_data.index >= pd.Timestamp(self.spec.sample.start)]
+
             train = reg_data[reg_data.index < t].dropna()
             if len(train) < 12 or t not in reg_data.index:
                 continue
