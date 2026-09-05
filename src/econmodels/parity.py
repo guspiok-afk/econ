@@ -8,7 +8,15 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from econmodels.base import ConceptRequest, Result, RunContext, TablesResult, register
+from econmodels.base import (
+    ConceptRequest,
+    Result,
+    RunContext,
+    TablesResult,
+    panel_for,
+    register,
+    series_for,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +42,7 @@ class UncoveredParity:
     requires = (
         ConceptRequest("fx_spot_usd", freq="M"),
         ConceptRequest("policy_rate", freq="M"),
+        ConceptRequest("policy_rate", entity="US", freq="M"),
     )
 
     def __init__(self, base: str, quote: str = "US", horizon_months: int = 12) -> None:
@@ -41,30 +50,13 @@ class UncoveredParity:
         self.quote = quote
         self.horizon_months = horizon_months
 
-    @staticmethod
-    def _resolve_column(panel: pd.DataFrame, concept: str, entity: str) -> str:
-        """The one column name the contract allows, or a refusal that names what was there.
-
-        No fallback and no guessing: a panel carrying a single column would otherwise resolve
-        every concept to it, and the regression would run on the exchange rate against itself
-        and report a number rather than an error.
-        """
-        col = f"{concept}@{entity}"
-        if col in panel.columns:
-            return col
-        raise KeyError(
-            f"the panel has no column {col!r}; it carries {sorted(map(str, panel.columns))}. "
-            "Build it with api.get_panel, which names columns concept@entity."
-        )
-
     def fit(self, panel: pd.DataFrame, ctx: RunContext) -> Result:
-        fx_col = self._resolve_column(panel, "fx_spot_usd", self.base)
-        base_rate_col = self._resolve_column(panel, "policy_rate", self.base)
-        quote_rate_col = self._resolve_column(panel, "policy_rate", self.quote)
-
-        s = np.log(panel[fx_col].astype(float))
+        panel_for(self, panel, entity=self.base)
+        s = np.log(series_for(panel, "fx_spot_usd", self.base))
         realised_dep = 100.0 * (s.shift(-self.horizon_months) - s)
-        differential = panel[base_rate_col].astype(float) - panel[quote_rate_col].astype(float)
+        differential = series_for(panel, "policy_rate", self.base) - series_for(
+            panel, "policy_rate", self.quote
+        )
 
         df = pd.DataFrame(
             {"dep": realised_dep, "diff": differential},

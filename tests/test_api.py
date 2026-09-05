@@ -263,6 +263,27 @@ def test_pairs_and_entities_together_are_refused(loaded: Api) -> None:
         loaded.get_panel([("gdp_real", "US")], entities=["US"])
 
 
+def test_a_panel_can_be_trimmed_by_date(loaded: Api) -> None:
+    """Bounds arrive as dates and the index holds Timestamps; pandas refuses to compare the two.
+
+    The previous version walked the index element by element, which worked only while the index
+    carried date objects. It broke silently the moment the panel started returning a proper time
+    index, and no test noticed until a live run raised a TypeError.
+    """
+    whole = loaded.get_panel(["gdp_real"], entity="US")
+    assert len(whole) > 2, "the fixture must span enough periods to cut"
+    middle = whole.index[len(whole) // 2]
+
+    cut = loaded.get_panel(["gdp_real"], entity="US", start=middle.date())
+    assert 0 < len(cut) < len(whole)
+    assert cut.index.min() >= middle
+
+    both = loaded.get_panel(
+        ["gdp_real"], entity="US", start=whole.index[0].date(), end=middle.date()
+    )
+    assert both.index.max() <= middle
+
+
 def test_a_panel_carries_a_datetime_index(loaded: Api) -> None:
     """Models resample, filter and shift on this index, and every fixture parses its dates.
 
