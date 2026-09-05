@@ -20,9 +20,8 @@ import pytest
 
 pytest.importorskip("econmodels.taylor", reason="WP-04b not implemented yet")
 
-from econmodels.taylor import TaylorRule
-
 from econmodels.base import RunContext
+from econmodels.taylor import TaylorRule
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "us_quarterly_taylor.csv"
 

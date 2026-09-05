@@ -117,4 +117,35 @@ section. Not `src/econmodels/base.py`, not `econbase`.
 
 ## Result
 
-(filled in by the executor)
+Implementado pelo Antigravity; revisado, corrigido e verificado contra a base viva pelo arquiteto.
+
+### Três correções na revisão
+
+1. **A inflação "anual" era um deslocamento de quatro linhas.** `shift(4)` é posicional, e nada
+   verificava que o índice era trimestral. Na chamada que o próprio pacote manda usar —
+   `api.get_panel` sem `freq`, que devolve um painel mensal porque o índice de preços é mensal
+   nos dois países — a inflação saía como variação de quatro **meses** rotulada como anual, e a
+   taxa prescrita vinha **seis pontos abaixo** do correto, sem exceção, sem aviso, e com o
+   diagnóstico ainda afirmando ter medido quatro trimestres. Agora `panel_for` recusa antes de
+   qualquer conta.
+2. **`gap_method` era aceito, nunca consultado, e escrito no diagnóstico como o método usado.**
+   Passar `"hamilton"` devolvia um hiato Hodrick-Prescott com rótulo errado. O filtro de Hamilton
+   está implementado e os dois produzem hiatos genuinamente diferentes; qualquer outro valor é
+   recusado com o motivo.
+3. **`estimate` aceitava uma regressão exatamente identificada.** A guarda era `len < 3` para
+   três parâmetros: os pontos eram interpolados, os erros-padrão ficavam indefinidos e a tabela
+   saía como qualquer outra. Agora exige graus de liberdade residuais.
+
+### Ao vivo, painel trimestral construído pelo `api.get_panel` em 2026-09-05
+
+| | n | correlação | desvio médio | último trimestre |
+|---|---:|---:|---:|---|
+| Estados Unidos (r\* 2,0, meta 2,0) | 106 | 0,419 | 3,04 | efetivo 3,63 · prescrito 6,40 · hiato −0,61 |
+| Brasil (r\* 4,5, meta 3,0) | 106 | 0,582 | 3,41 | efetivo 14,25 · prescrito 9,94 · hiato +0,13 |
+
+A regra roda nos dois países trocando um argumento, e o Brasil não usa dois por cento nem de
+juro neutro nem de meta — que era o item da definição de pronto.
+
+Os dois resultados dizem coisas opostas e ambas plausíveis: a taxa americana está bem abaixo do
+que a regra prescreve, e a brasileira bem acima. Uma regra de Taylor com juro neutro fixo é uma
+referência, não um alvo, e é para isso que o `r*` é parâmetro e vai no diagnóstico.
