@@ -69,7 +69,7 @@ derrota no período calmo, para que nenhum dos dois circule sozinho.
 class DynamicFactorNowcast:
     model_id = "dfm_nowcast"
     model_version = "1"
-    requires: Sequence[ConceptRequest]   # indicadores freq="M"; o alvo sem alegação de grade
+    requires: Sequence[ConceptRequest]  # indicadores freq="M"; o alvo sem alegação de grade
 
     def __init__(
         self,
