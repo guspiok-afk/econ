@@ -44,7 +44,15 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from econmodels.base import ConceptRequest, Result, RunContext, TablesResult, register
+from econmodels.base import (
+    ConceptRequest,
+    Result,
+    RunContext,
+    TablesResult,
+    panel_for,
+    register,
+    series_for,
+)
 
 
 def _hp_filter(y: np.ndarray, lamb: float) -> np.ndarray:
@@ -64,12 +72,49 @@ def _yoy_inflation(cpi: pd.Series) -> pd.Series:
     return (cpi / cpi.shift(4) - 1.0) * 100.0
 
 
-def _output_gap(gdp: pd.Series, hp_lambda: float) -> pd.Series:
-    """Output gap in percent of potential, via HP filter on log GDP."""
+def _hamilton_gap(log_gdp: np.ndarray, horizon: int = 8, lags: int = 4) -> np.ndarray:
+    """Hamilton's (2018) alternative to the Hodrick-Prescott filter.
+
+    Regress the level on its own values ``horizon`` periods earlier and call the residual the
+    cycle. It has no endpoint problem and no smoothing parameter to choose, which are the two
+    complaints against Hodrick-Prescott — and it is genuinely a different filter, which is the
+    point: ``gap_method`` was accepted, never consulted, and still written into the diagnostics
+    as the method that had been used.
+    """
+    y = pd.Series(log_gdp)
+    design = pd.concat([y.shift(horizon + i) for i in range(lags)], axis=1)
+    design.columns = [f"lag{i}" for i in range(lags)]
+    frame = pd.concat([y.rename("y"), design], axis=1).dropna()
+    if len(frame) <= lags + 1:
+        raise ValueError(
+            f"the Hamilton filter needs more than {lags + 1} usable observations after "
+            f"{horizon + lags} are consumed by its own lags; the sample has {len(frame)}"
+        )
+    fitted = sm.OLS(frame["y"], sm.add_constant(frame.drop(columns="y"))).fit()
+    gap = pd.Series(np.nan, index=y.index, dtype=float)
+    gap.loc[frame.index] = fitted.resid
+    return np.asarray(gap) * 100.0
+
+
+def _output_gap(gdp: pd.Series, hp_lambda: float, method: str = "hp") -> pd.Series:
+    """Output gap in percent of potential."""
     log_gdp = np.log(gdp.values.astype(float))
-    trend = _hp_filter(log_gdp, hp_lambda)
-    gap_pct = (np.exp(log_gdp - trend) - 1.0) * 100.0
+    if method == "hp":
+        trend = _hp_filter(log_gdp, hp_lambda)
+        gap_pct = (np.exp(log_gdp - trend) - 1.0) * 100.0
+    elif method == "hamilton":
+        gap_pct = _hamilton_gap(log_gdp)
+    else:
+        raise ValueError(
+            f"unknown gap_method {method!r}; use 'hp' or 'hamilton'. A method that is accepted "
+            "and then ignored is worse than one that is refused, because the result carries an "
+            "assumption that was never applied."
+        )
     return pd.Series(gap_pct, index=gdp.index, name="gap")
+
+
+#: Residual degrees of freedom below which a standard error means nothing.
+_MIN_RESIDUAL_DF = 10
 
 
 @register
@@ -101,38 +146,35 @@ class TaylorRule:
         self.gap_method = gap_method
         self.hp_lambda = hp_lambda
 
-    @property
-    def requires(self) -> Sequence[ConceptRequest]:
-        return (
-            ConceptRequest("cpi_headline_index", freq="Q"),
-            ConceptRequest("gdp_real", freq="Q"),
-            ConceptRequest("policy_rate", freq="Q"),
-        )
+    requires: Sequence[ConceptRequest] = (
+        ConceptRequest("cpi_headline_index", freq="Q"),
+        ConceptRequest("gdp_real", freq="Q"),
+        ConceptRequest("policy_rate", freq="Q"),
+    )
 
     # ------------------------------------------------------------------ column helpers
     def _col(self, concept: str) -> str:
         return f"{concept}@{self.entity}"
 
     def _extract(self, panel: pd.DataFrame) -> tuple[pd.Series, pd.Series, pd.Series]:
-        """Extract the three required series from the panel, validating presence."""
-        cpi_col = self._col("cpi_headline_index")
-        gdp_col = self._col("gdp_real")
-        rate_col = self._col("policy_rate")
+        """The three series, after the panel has been checked against what the model declared.
 
-        for col in (cpi_col, gdp_col, rate_col):
-            if col not in panel.columns:
-                raise ValueError(f"missing column {col!r} in panel")
-
-        cpi = panel[cpi_col].dropna()
-        gdp = panel[gdp_col].dropna()
-        rate = panel[rate_col]
+        `panel_for` is what makes the row shifts below mean what they say. Every lag here is
+        positional — `cpi.shift(4)` for a four-quarter change — and that is a four-quarter change
+        only on a quarterly index with no holes. On the monthly panel `api.get_panel` returns by
+        default it was a four-month change reported as annual, and the prescribed rate came out
+        six points low with no exception and no warning.
+        """
+        panel_for(self, panel, entity=self.entity)
+        cpi = series_for(panel, "cpi_headline_index", self.entity).dropna()
+        gdp = series_for(panel, "gdp_real", self.entity).dropna()
+        rate = series_for(panel, "policy_rate", self.entity)
 
         if len(cpi) < 5 or len(gdp) < 5:
             raise ValueError(
                 f"not enough observations to compute the Taylor rule "
                 f"(CPI has {len(cpi)}, GDP has {len(gdp)}; need at least 5)"
             )
-
         return cpi, gdp, rate
 
     def _diagnostics(self, actual: pd.Series, prescribed: pd.Series) -> pd.DataFrame:
@@ -172,7 +214,7 @@ class TaylorRule:
         inflation = _yoy_inflation(cpi)
 
         # Output gap via HP filter on log GDP — computed on *this* panel only
-        gap = _output_gap(gdp, self.hp_lambda)
+        gap = _output_gap(gdp, self.hp_lambda, self.gap_method)
 
         # Build a common index (intersection of all series)
         common = inflation.dropna().index.intersection(gap.dropna().index).intersection(rate.index)
@@ -220,15 +262,22 @@ class TaylorRule:
         cpi, gdp, rate = self._extract(panel)
 
         inflation = _yoy_inflation(cpi)
-        gap = _output_gap(gdp, self.hp_lambda)
+        gap = _output_gap(gdp, self.hp_lambda, self.gap_method)
 
         common = (
             inflation.dropna()
             .index.intersection(gap.dropna().index)
             .intersection(rate.dropna().index)
         )
-        if len(common) < 3:
-            raise ValueError("not enough observations for estimation")
+        # Three regressors are fitted here (constant, inflation, gap), so three observations
+        # interpolate them exactly: zero residual degrees of freedom, undefined standard errors,
+        # and a coefficients table that looks like any other. Demand degrees of freedom, not rows.
+        needed = 3 + _MIN_RESIDUAL_DF
+        if len(common) < needed:
+            raise ValueError(
+                f"not enough observations for estimation: {len(common)} usable, and fitting "
+                f"three parameters with residual degrees of freedom needs at least {needed}"
+            )
 
         y = rate.reindex(common).astype(float)
         X = pd.DataFrame({"inflation": inflation.reindex(common), "gap": gap.reindex(common)})

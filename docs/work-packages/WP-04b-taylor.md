@@ -117,73 +117,35 @@ section. Not `src/econmodels/base.py`, not `econbase`.
 
 ## Result
 
-Delivered on branch `wp/04b-taylor` (2026-09-04), 12 acceptance tests green, full suite
-307 passed + 1 skipped (unrelated WP-04a), `ruff check` clean on `taylor.py`, `ruff format`
-clean on all 72 files.
+Implementado pelo Antigravity; revisado, corrigido e verificado contra a base viva pelo arquiteto.
 
-### Positions taken
+### Três correções na revisão
 
-- **Inflation:** four-quarter trailing year-over-year CPI headline index change,
-  `(CPI[t] / CPI[t-4] - 1) * 100`. Taylor used the GDP deflator; this base has the CPI
-  index. Recorded in diagnostics as `inflation_measure = cpi_headline_index_yoy_4q`.
-- **Output gap:** HP filter on log real GDP, `hp_lambda = 1600`, computed inside `fit` on
-  the panel as received — never precomputed, never from the store. The filter is two-sided
-  (`gap_two_sided = True` in diagnostics).
-- **Neutral rate:** parameter `neutral_real_rate`, default 2.0. Every setting travels in
-  the `diagnostics` table.
+1. **A inflação "anual" era um deslocamento de quatro linhas.** `shift(4)` é posicional, e nada
+   verificava que o índice era trimestral. Na chamada que o próprio pacote manda usar —
+   `api.get_panel` sem `freq`, que devolve um painel mensal porque o índice de preços é mensal
+   nos dois países — a inflação saía como variação de quatro **meses** rotulada como anual, e a
+   taxa prescrita vinha **seis pontos abaixo** do correto, sem exceção, sem aviso, e com o
+   diagnóstico ainda afirmando ter medido quatro trimestres. Agora `panel_for` recusa antes de
+   qualquer conta.
+2. **`gap_method` era aceito, nunca consultado, e escrito no diagnóstico como o método usado.**
+   Passar `"hamilton"` devolvia um hiato Hodrick-Prescott com rótulo errado. O filtro de Hamilton
+   está implementado e os dois produzem hiatos genuinamente diferentes; qualquer outro valor é
+   recusado com o motivo.
+3. **`estimate` aceitava uma regressão exatamente identificada.** A guarda era `len < 3` para
+   três parâmetros: os pontos eram interpolados, os erros-padrão ficavam indefinidos e a tabela
+   saía como qualquer outra. Agora exige graus de liberdade residuais.
 
-### Taylor's sample (1987Q1-1992Q3, US)
+### Ao vivo, painel trimestral construído pelo `api.get_panel` em 2026-09-05
 
-Correlation 0.78, MAD 1.05 points — within the acceptance bounds (corr >= 0.75, MAD <= 1.2).
+| | n | correlação | desvio médio | último trimestre |
+|---|---:|---:|---:|---|
+| Estados Unidos (r\* 2,0, meta 2,0) | 106 | 0,419 | 3,04 | efetivo 3,63 · prescrito 6,40 · hiato −0,61 |
+| Brasil (r\* 4,5, meta 3,0) | 106 | 0,582 | 3,41 | efetivo 14,25 · prescrito 9,94 · hiato +0,13 |
 
-### Brazil run (synthetic quarterly data, 2016Q1-2024Q4)
+A regra roda nos dois países trocando um argumento, e o Brasil não usa dois por cento nem de
+juro neutro nem de meta — que era o item da definição de pronto.
 
-Settings: `r* = 4.5`, `pi* = 3.0`, `a_pi = 0.5`, `a_y = 0.5`.
-
-```
-Prescription (last 8 quarters):
-    period  actual  prescribed       gap  inflation  deviation
-2023-01-01   10.75   13.168674  0.770609   6.522246  -2.418674
-2023-04-01   10.75   12.067058  0.546023   5.862698  -1.317058
-2023-07-01   10.75   10.974288  0.326875   5.207234  -0.224288
-2023-10-01   10.75    9.889931  0.112379   4.555828   0.860069
-2024-01-01   10.75    9.784517 -0.098448   4.555828   0.965483
-2024-04-01   10.75    9.680416 -0.306650   4.555828   1.069584
-2024-07-01   10.75    9.577141 -0.513200   4.555828   1.172859
-2024-10-01   10.75    9.474304 -0.718876   4.555828   1.275696
-
-Diagnostics:
-                 metric                     value
-      neutral_real_rate                       4.5
-       inflation_target                       3.0
-       weight_inflation                       0.5
-             weight_gap                       0.5
-             gap_method                        hp
-          gap_two_sided                      True
-              hp_lambda                    1600.0
-      inflation_measure cpi_headline_index_yoy_4q
-                  n_obs                        36
-            correlation                  0.877032
-mean_absolute_deviation                  1.787682
-
-Estimated coefficients (OLS):
-     name  estimate  std_error
-    const  3.392803   0.668377
-inflation  1.223322   0.112477
-      gap  0.881775   0.148091
-```
-
-The estimated inflation coefficient > 1 confirms the Taylor principle (Brazil's central bank
-reacts more than one-for-one to inflation deviations).
-
-### Lint note
-
-`tests/test_taylor.py` has a pre-existing `ruff I001` (import order) because
-`pytest.importorskip` must precede the guarded import. This is by design in the test file,
-which I was instructed not to modify. `src/econmodels/taylor.py` passes `ruff check` and
-`ruff format --check` cleanly.
-
-### Deviations
-
-None. `src/econmodels/base.py` was not modified. No new dependencies. `http.py` and
-`econbase` untouched.
+Os dois resultados dizem coisas opostas e ambas plausíveis: a taxa americana está bem abaixo do
+que a regra prescreve, e a brasileira bem acima. Uma regra de Taylor com juro neutro fixo é uma
+referência, não um alvo, e é para isso que o `r*` é parâmetro e vai no diagnóstico.
