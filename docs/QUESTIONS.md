@@ -174,4 +174,37 @@ amostra estimavel inteira. Junto com elas vale coletar `10844` (servicos) e `444
 
 Estes eu não decido sozinho porque a escolha é sua, de economista, e muda o trabalho.
 
-Nenhum por enquanto.
+### C1. O PIB brasileiro do catálogo não é dessazonalizado — BLOQUEANTE
+
+Achado pela execução ao vivo do WP-05a. `sidra:1620/583` está catalogado com
+`seasonal_adj: true` e **não é**. Dummies de trimestre explicam **55,3%** da variação do
+crescimento trimestral (p = 2,4e-20); a mesma medida nos Estados Unidos dá 0,7% (p = 0,53). O
+padrão é visível a olho nu nos últimos oito trimestres: +2,3 / −2,9 / +0,8 / +2,2 / +1,8 /
+−2,9 / +0,8 / +2,3.
+
+A tabela 1620 do SIDRA é a série encadeada **sem** ajuste sazonal. A dessazonalizada é a
+tabela 1621.
+
+**Por que é bloqueante e não uma correção que eu faça sozinho:** `gdp_real@BR` é insumo de
+`taylor.py` (hiato do produto por filtro HP ou Hamilton), `var.py`, `local_projections.py` e
+`sign_restrictions.py`. Trocar a série que carrega o conceito muda todo resultado brasileiro já
+produzido — inclusive a regra de Taylor que prescreveu 9,94% contra a Selic de 14,25%, cujo
+hiato foi filtrado sobre uma série sazonal. Filtrar HP uma série não ajustada produz um "hiato"
+que é em boa parte o calendário.
+
+**As opções, e a decisão é sua:**
+
+1. Repontar `gdp_real@BR` para `sidra:1621/584` e reprocessar os modelos brasileiros. É a
+   correção certa e invalida os números brasileiros das fases 4 e 5 já rodados.
+2. Manter as duas séries com conceitos distintos (`gdp_real` bruto e `gdp_real_sa` ajustado) e
+   fazer cada modelo declarar qual quer. Mais trabalho, mais honesto sobre o que existe.
+3. Ajustar sazonalmente no nosso lado (X-13, que já está em `transforms.py`) e gravar como
+   série derivada com `method_version`. Dá controle e cria uma divergência com o número
+   publicado pelo IBGE.
+
+Minha sugestão é a **2**, porque preserva o dado como publicado e torna a exigência explícita
+no modelo em vez de escondida no catálogo. Mas isso muda o contrato de dados e é sua chamada.
+
+**Enquanto não se decide, nada está silenciosamente errado:** `econmodels/dfm.py` mede a
+sazonalidade do alvo e **recusa** rodar acima de 25%, nomeando a série. O Brasil não roda o
+nowcast hoje, e isso é melhor que rodar e devolver o calendário.

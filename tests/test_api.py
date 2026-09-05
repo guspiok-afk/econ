@@ -15,7 +15,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from econbase.api import Api, ApiError, connect
+from econbase.api import Api, ApiError, _coarser_than, connect
+from econbase.transforms import TransformError
 
 FRED_FIX = Path(__file__).parent / "fixtures" / "fred"
 
@@ -246,3 +247,67 @@ def test_connect_opens_the_real_catalog(data_dir: Path) -> None:
     api = connect("catalog")
     assert "fred:GDPC1" in api.catalog.series
     assert api.store.data_dir == data_dir.resolve()
+
+
+# ------------------------------------------------------------------ ragged panels
+def test_a_quarterly_series_cannot_be_stretched_onto_a_monthly_grid(loaded: Api) -> None:
+    """The refusal that mixed_freq exists to make explicit rather than to remove."""
+    with pytest.raises(TransformError, match="cannot upsample"):
+        loaded.get_panel([("gdp_real", "US"), ("govt_yield_10y", "US")], freq="M")
+
+
+def test_mixed_freq_places_a_coarser_series_on_its_own_periods(loaded: Api) -> None:
+    """A quarterly column on a monthly grid keeps four values a year and eight holes.
+
+    This is not interpolation and must never become it: the empty cells are what a
+    mixed-frequency model estimates, and filling them here would answer its question for it.
+    """
+    panel = loaded.get_panel(
+        [("gdp_real", "US"), ("govt_yield_10y", "US")], freq="M", mixed_freq=True
+    )
+    assert panel["gdp_real@US"].isna().any()
+    assert set(panel["gdp_real@US"].dropna().index.month) <= {1, 4, 7, 10}
+
+
+def test_mixed_freq_still_aggregates_a_finer_series(loaded: Api) -> None:
+    """The half that is easy to get wrong. A daily series left on its native dates would land
+    off the monthly grid and be dropped by the reindex without a word — a column of holes where
+    the most timely data in the panel used to be.
+    """
+    panel = loaded.get_panel(
+        [("gdp_real", "US"), ("govt_yield_10y", "US")], freq="M", mixed_freq=True, agg=None
+    )
+    yields = panel["govt_yield_10y@US"]
+    assert yields.notna().sum() > 0, "the daily series must survive onto the grid"
+    assert set(yields.dropna().index) <= set(panel.index)
+
+
+def test_which_series_keep_their_native_periods(loaded: Api) -> None:
+    """The rule stated directly, because the fixture's daily series is one observation long and
+    cannot demonstrate it on its own."""
+    assert _coarser_than("Q", "M") and _coarser_than("A", "Q")
+    assert not _coarser_than("D", "M")
+    assert not _coarser_than("M", "M")
+    with pytest.raises(ApiError, match="cannot compare"):
+        _coarser_than("fortnightly", "M")
+
+
+def test_a_ragged_panel_still_has_a_complete_grid(loaded: Api) -> None:
+    """A hole in the index is not the same as a hole in a column: models shift by row."""
+    panel = loaded.get_panel(
+        [("gdp_real", "US"), ("govt_yield_10y", "US")], freq="M", mixed_freq=True
+    )
+    expected = pd.date_range(panel.index.min(), panel.index.max(), freq="MS")
+    assert list(panel.index) == list(expected)
+
+
+def test_a_ragged_panel_needs_to_be_told_its_grid(loaded: Api) -> None:
+    with pytest.raises(ApiError, match="mixed_freq needs an explicit freq"):
+        loaded.get_panel([("gdp_real", "US")], mixed_freq=True)
+
+
+def test_a_ragged_panel_refuses_an_aggregation(loaded: Api) -> None:
+    """Aggregating is the opposite of what this flag asks for, so silently ignoring it would
+    let a caller believe a conversion happened."""
+    with pytest.raises(ApiError, match="agg cannot apply"):
+        loaded.get_panel([("gdp_real", "US")], freq="M", mixed_freq=True, agg="mean")
