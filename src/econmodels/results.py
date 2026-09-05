@@ -53,6 +53,14 @@ def git_sha(repo: Path | None = None) -> str | None:
         return None
 
 
+def _spec_params(spec: Any | None) -> dict[str, Any]:
+    """The resolved specification, so a run reconstructs even if its file later changes."""
+    if spec is None:
+        return {}
+    as_params = getattr(spec, "as_params", None)
+    return as_params() if callable(as_params) else {}
+
+
 def _melt(table_name: str, frame: pd.DataFrame, run_id: str) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for row_ix, (_, row) in enumerate(frame.iterrows()):
@@ -95,6 +103,7 @@ def save_result(
     seed: int = 0,
     entity_id: str | None = None,
     vintage_kind: str = "latest",
+    spec: Any | None = None,
     params: dict[str, Any] | None = None,
     catalog_hash: str | None = None,
     package_version: str | None = None,
@@ -123,7 +132,13 @@ def save_result(
                 "asof": asof,
                 "seed": int(seed),
                 "vintage_kind": vintage_kind,
-                "params": json.dumps(params or {}, sort_keys=True, default=str),
+                "spec_id": getattr(spec, "spec_id", None),
+                "spec_hash": getattr(spec, "spec_hash", None),
+                "params": json.dumps(
+                    params if params is not None else _spec_params(spec),
+                    sort_keys=True,
+                    default=str,
+                ),
                 "git_sha": git_sha(),
                 "package_version": package_version,
                 "catalog_hash": catalog_hash,
