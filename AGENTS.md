@@ -84,6 +84,15 @@ comment on the issue instead of editing it.
    architect works from `C:\dev\econ-claude`.
 4. Open a PR to `main`. CI (ruff + pytest) must be green. The architect (Claude Code)
    reviews and merges. Address review comments in the same branch.
+   **Never force-push a branch that has a PR open.** Rebuild it from `main` if you must, but
+   push corrections as new commits: a force-push over a reviewed branch replaces a tree that
+   somebody already read. It has happened twice. The second time the merge carried an older
+   tree into `main` and deleted 4,290 lines across forty-three files — the parity model, the
+   results store, the panel guard, eleven test files — and neither the suite nor the review
+   caught it, because a deleted test does not fail and a PR diff against an old merge base
+   shows the deletions as "unchanged". `tests/test_tree.py` is what catches it now.
+   **Never open a PR whose base is another PR's branch.** Merging the first with
+   `--delete-branch` closes the second in silence and the work is only found by accident.
 5. Do not start a WP whose acceptance tests do not exist yet; ask for them.
 6. Do not widen the scope: no extra files, no drive-by refactors, no new dependencies
    unless the WP lists them.
