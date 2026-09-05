@@ -48,9 +48,46 @@ def test_daily_to_monthly_skips_days_that_do_not_exist() -> None:
 
 
 def test_a_period_with_no_observation_is_dropped_not_filled() -> None:
+    """The subject is the missing second quarter, which must be absent rather than interpolated."""
     f = frame([("2024-01-01", 1.0), ("2024-07-01", 2.0)])
     out = transforms.resample(f, from_freq="M", to_freq="Q", agg="mean")
-    assert list(out["period"]) == [dt.date(2024, 1, 1), dt.date(2024, 7, 1)]
+    assert dt.date(2024, 4, 1) not in list(out["period"])
+    assert dt.date(2024, 1, 1) in list(out["period"])
+
+
+def test_a_quarter_the_source_does_not_cover_is_not_reported_as_one() -> None:
+    """Two months of a quarter are not a quarter, and the number reads as if they were.
+
+    On the live base at 30 June 2024 the Brazilian inflation aggregate came to 0.842 from April
+    and May, where the finished quarter is 1.054. Under an as-of date that is not a rounding
+    error: a backtest compares a forecast of a whole quarter against two thirds of one.
+    """
+    two_thirds = frame([("2024-04-01", 1.0), ("2024-05-01", 1.0)])
+    assert transforms.resample(two_thirds, from_freq="M", to_freq="Q", agg="sum").empty
+
+    whole = frame([("2024-04-01", 1.0), ("2024-05-01", 1.0), ("2024-06-01", 1.0)])
+    out = transforms.resample(whole, from_freq="M", to_freq="Q", agg="sum")
+    assert list(out["period"]) == [dt.date(2024, 4, 1)]
+
+
+def test_the_partial_period_can_be_asked_for_deliberately() -> None:
+    two_thirds = frame([("2024-04-01", 1.0), ("2024-05-01", 1.0)])
+    out = transforms.resample(
+        two_thirds, from_freq="M", to_freq="Q", agg="sum", drop_incomplete=False
+    )
+    assert list(out["value"]) == [2.0]
+
+
+def test_a_daily_source_keeps_the_month_in_progress() -> None:
+    """Ten business days out of twenty is a partial average, and a partial average is wanted.
+
+    The calendar is the only thing that would call the month over, and for a daily series that is
+    not the transform's business — unlike three months making a quarter, where a missing one
+    distorts by a third and hides it.
+    """
+    days = frame([(f"2024-04-{d:02d}", 1.0) for d in range(1, 11)])
+    out = transforms.resample(days, from_freq="D", to_freq="M", agg="mean")
+    assert list(out["period"]) == [dt.date(2024, 4, 1)]
 
 
 def test_upsampling_is_refused_with_a_reason() -> None:

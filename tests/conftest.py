@@ -6,13 +6,19 @@ import datetime as dt
 from collections.abc import Callable
 from pathlib import Path
 
+import httpx
 import pandas as pd
 import pyarrow as pa
 import pytest
+import respx
 
+from econbase import pipeline
+from econbase.api import Api
 from econbase.catalog import Catalog
 from econbase.settings import Settings, get_settings
 from econbase.sources.base import StaticSource
+from econbase.sources.fred import ENDPOINT, FredSource
+from econbase.sources.http import Client
 from econbase.store import Store
 
 UTC = dt.UTC
@@ -131,3 +137,81 @@ def leakage_guard() -> Callable[[pa.Table, dt.date], None]:
         assert late.empty, f"leakage: {len(late)} rows with realtime_start > {asof}"
 
     return _check
+
+
+# ---------------------------------------------------------------- the recorded FRED fixture
+# Moved here from test_api.py once a second file needed it: the vintage tests ask exactly the
+# question this fixture was built to answer, and a fixture two files share belongs in conftest.
+FRED_FIX = Path(__file__).parent / "fixtures" / "fred"
+
+FRED_CONCEPTS_YAML = """\
+concepts:
+  gdp_real: {description: Real GDP, unit_kind: level, default_agg: sum}
+  govt_yield_10y: {description: Ten-year yield, unit_kind: pct_pa, default_agg: eop}
+  cpi_headline: {description: CPI, unit_kind: pct, default_agg: sum}
+"""
+
+FRED_ENTITIES_YAML = """\
+entities:
+  - {entity_id: US, entity_type: country, name: United States}
+  - {entity_id: BR, entity_type: country, name: Brazil}
+"""
+
+FRED_YAML = """\
+source: fred
+defaults: {entity_id: US, license: FRED terms, redistributable: false}
+series:
+  - native_id: GDPC1
+    concept_id: gdp_real
+    title: Real Gross Domestic Product
+    unit: bn chained 2017 USD
+    freq: Q
+    seasonal_adj: true
+    expected_lag_days: 30
+  - native_id: DGS10
+    concept_id: govt_yield_10y
+    title: Ten-year Treasury constant maturity
+    unit: percent per year
+    freq: B
+    expected_lag_days: 1
+    params: {vintages: false}
+"""
+
+
+@pytest.fixture
+def catalog_us(tmp_path: Path) -> Catalog:
+    root = tmp_path / "catalog"
+    (root / "us").mkdir(parents=True)
+    (root / "concepts.yaml").write_text(FRED_CONCEPTS_YAML, encoding="utf-8")
+    (root / "entities.yaml").write_text(FRED_ENTITIES_YAML, encoding="utf-8")
+    (root / "us" / "fred.yaml").write_text(FRED_YAML, encoding="utf-8")
+    return Catalog.load(root)
+
+
+@pytest.fixture
+def loaded(store: Store, catalog_us: Catalog) -> Api:
+    """A store holding the recorded FRED vintages of GDP and the daily ten-year yield."""
+    settings = Settings(_env_file=None, fred_api_key="test-key")
+    client = Client(settings, sleep=lambda _: None, monotonic=lambda: 0.0)
+    source = FredSource(settings, client=client)
+    with respx.mock:
+        respx.get(ENDPOINT).mock(
+            side_effect=lambda request: httpx.Response(
+                200,
+                content=(FRED_FIX / "GDPC1_2024_vintages.json").read_bytes()
+                if "GDPC1" in str(request.url)
+                else (FRED_FIX / "DGS10_novintage_2026_01.json").read_bytes(),
+            )
+        )
+        pipeline.update(
+            store,
+            catalog_us,
+            {"fred": source},
+            now=dt.datetime(2026, 9, 4, 12, tzinfo=dt.UTC),
+            tz="UTC",
+        )
+    client.close()
+    return Api(store, catalog_us)
+
+
+# ---------------------------------------------------------------------------- resolution
