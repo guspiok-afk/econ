@@ -179,9 +179,10 @@ def test_restrictions_nothing_can_satisfy_are_refused_rather_than_returned_empty
         SignRestrictedVAR(
             entity="US",
             lags=4,
-            horizon=8,
+            horizon=20,
+            restrict_through=20,
             draws=200,
-            signs={"policy": 1, "output": 1, "inflation": 1},
+            signs={"policy": 1, "output": -1, "inflation": -1},
         ).fit(us_panel(), ctx())
 
 
