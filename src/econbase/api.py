@@ -286,10 +286,17 @@ def _trim(frame: pd.DataFrame, start: dt.date | None, end: dt.date | None) -> pd
 
 
 def _trim_index(panel: pd.DataFrame, start: dt.date | None, end: dt.date | None) -> pd.DataFrame:
+    """Cut the panel to a date window.
+
+    The bounds arrive as plain dates and the index holds Timestamps. Pandas refuses to compare
+    the two rather than guessing, which is the right call and is why this converts the bound
+    instead of walking the index — the previous version compared element by element and worked
+    only while the index carried date objects.
+    """
     if start is not None:
-        panel = panel[[d >= start for d in panel.index]]
+        panel = panel[panel.index >= pd.Timestamp(start)]
     if end is not None:
-        panel = panel[[d <= end for d in panel.index]]
+        panel = panel[panel.index <= pd.Timestamp(end)]
     return panel
 
 

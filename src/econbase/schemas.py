@@ -124,6 +124,10 @@ MODEL_RUNS = pa.schema(
         pa.field("asof", pa.date32(), nullable=False),
         pa.field("seed", pa.int64(), nullable=False),
         pa.field("vintage_kind", pa.string(), nullable=False),
+        pa.field("spec_id", pa.string(), nullable=True),
+        # The content of the specification file, so a run stays reproducible when the file
+        # is later edited. Without it an edit silently re-labels every earlier run.
+        pa.field("spec_hash", pa.string(), nullable=True),
         pa.field("params", pa.string(), nullable=True),  # JSON, so a rerun is reconstructible
         pa.field("git_sha", pa.string(), nullable=True),
         pa.field("package_version", pa.string(), nullable=True),

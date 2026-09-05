@@ -19,7 +19,7 @@ import pytest
 
 pytest.importorskip("econmodels.parity", reason="WP-04a not implemented yet")
 
-from econmodels.base import RunContext
+from econmodels.base import PanelError, RunContext
 from econmodels.parity import UncoveredParity
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "br_us_monthly_parity.csv"
@@ -162,7 +162,7 @@ def test_a_panel_of_the_wrong_shape_is_refused_rather_than_guessed() -> None:
         {"fx_spot_usd@BR": [1.0] * 100},
         index=pd.date_range("2000-01-01", periods=100, freq="MS"),
     )
-    with pytest.raises(KeyError, match=r"policy_rate@BR"):
+    with pytest.raises(PanelError, match=r"policy_rate@BR"):
         UncoveredParity(base="BR", quote="US", horizon_months=HORIZON).fit(single, ctx())
 
 

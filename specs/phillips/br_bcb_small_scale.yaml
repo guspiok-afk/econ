@@ -1,0 +1,42 @@
+# Segue a curva de Phillips agregada do modelo semiestrutural de pequeno porte do Banco Central,
+# equação (1) do boxe de junho de 2024, adaptada ao que o catálogo tem. Ver docs/referencias/phillips.md.
+spec_id: br_bcb_small_scale
+model_id: phillips
+version: "1"
+entity: BR
+
+provenance:
+  follows: >
+    Banco Central do Brasil, Relatório de Inflação de junho de 2024, boxe "Atualização dos
+    modelos semiestruturais de pequeno porte", equação (1) — versão agregada.
+  source_url: https://www.bcb.gov.br/content/ri/relatorioinflacao/202406/ri202406b12p.pdf
+  departs: >
+    Sem o termo de commodities em reais (o IC-Br não está no catálogo), então o coeficiente do
+    câmbio aqui é o repasse cheio e não deve ser comparado com o 0,011 do boxe, e sim com o
+    ~0,06 das projeções locais de março de 2026. Câmbio nominal em vez de desvio da paridade do
+    poder de compra. Hiato do IBC-Br filtrado em vez do hiato latente estimado no sistema —
+    atenuação conhecida e quantificada no TD 339 do próprio Banco Central. Sem o termo climático.
+
+dependent:
+  concept: cpi_free
+  transform: annualised_quarterly
+
+terms:
+  - {name: expectativa, concept: inflation_expectations_12m, lags: [0]}
+  - {name: inercia_livres, concept: cpi_free, transform: annualised_quarterly, lags: [1]}
+  - {name: inercia_cheia, concept: cpi_headline, transform: annualised_quarterly, lags: [1, 2, 3, 4]}
+  - {name: repasse, concept: fx_spot_usd, transform: log_diff, lags: [1]}
+  - {name: folga, concept: activity_index, transform: hamilton_gap, lags: [1]}
+
+restrictions:
+  # Verticalidade de longo prazo, imposta por construção e não estimada. O termo cambial fica de
+  # fora da soma unitária, como na versão bayesiana do Banco Central.
+  - {kind: sum_to_one, over: [expectativa, inercia_livres, inercia_cheia]}
+
+estimation: {method: ols, cov: newey_west, maxlags: 4}
+sample: {start: "2004-01-01"}
+
+notes: >
+  A amostra começa em 2004 porque o IBC-Br começa em 2003 e quatro defasagens consomem o
+  primeiro ano. O IPCA desde 1980 não compra amostra utilizável: o WP 122 do Banco Central
+  desaconselha o período anterior ao Plano Real, e o boxe de 2024 descarta até 2003T3.

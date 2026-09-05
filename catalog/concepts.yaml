@@ -14,6 +14,24 @@ concepts:
     description: Core consumer price index (ex food and energy or central bank core), monthly percentage change
     unit_kind: pct
     default_agg: compound
+  cpi_free:
+    # Free prices are what a Phillips curve explains; the Banco Central's own model puts them on
+    # the left-hand side precisely because administered prices do not respond to slack.
+    description: IPCA free prices, monthly percentage change
+    unit_kind: pct
+    default_agg: compound
+  cpi_administered:
+    description: IPCA administered prices, monthly percentage change
+    unit_kind: pct
+    default_agg: compound
+  cpi_services:
+    description: IPCA services, monthly percentage change
+    unit_kind: pct
+    default_agg: compound
+  cpi_tradables:
+    description: IPCA tradable goods, monthly percentage change
+    unit_kind: pct
+    default_agg: compound
   cpi_sticky:
     description: Sticky-price CPI, annualized monthly percentage change
     unit_kind: pct
