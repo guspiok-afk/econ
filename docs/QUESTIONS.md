@@ -104,64 +104,74 @@ derivada, o que exerceria o caminho de derivadas — mas duplica dado que já es
 
 ---
 
+## Resolvidas
+
+### B1. Curva de Phillips: qual especificação? — RESOLVIDA pela fonte
+
+Existe especificação publicada e vigente: **Banco Central, Relatório de Inflação de junho de 2024,
+boxe "Atualização dos modelos semiestruturais de pequeno porte", equação (1)**, com as modas da
+posteriori e os intervalos de credibilidade. Confirmada como corrente pela nota de rodapé 5 do
+boxe de repasse cambial do Relatório de Política Monetária de março de 2026.
+
+```
+pi_livres_t = a1L*pi_livres_{t-1} + a1I*(1/4)*soma(pi_ipca_{t-i})
+            + (1 - a1L - a1I)*(pi_focus_t/4)
+            + a2*commodities_em_reais_t + a3*cambio_{t-1} + a4*hiato_t + clima + erro
+```
+
+com `a1L = 0,24`, `a1I = 0,38`, expectativas `= 0,38`, `a2 = 0,023`, `a3 = 0,011`, `a4 = 0,120`.
+
+Três coisas que mudam o pacote:
+
+1. **A dependente é a inflação de preços livres**, não o IPCA cheio. Os monitorados, cerca de um
+   quarto do índice, são projetados por vinte e quatro equações calibradas a partir de regra
+   institucional — Brent, Itaipu indexada ao IPC americano, regra da ANS, teto CMED — e não
+   respondem a hiato. Regredir o cheio contra folga mistura dois blocos e atenua por construção.
+2. **A verticalidade é imposta, não estimada.** O peso das expectativas é escrito como
+   `(1 - a1L - a1I)`. A soma de 2,42 que obtive na tentativa exploratória não era um achado, era
+   uma equação mal posta.
+3. **O câmbio entra duas vezes.** O termo de commodities é o IC-Br **em reais**, que já contém o
+   câmbio, e por isso `a3 = 0,011` é apenas o resíduo cambial. Comparar um repasse cheio com esse
+   número é o erro de leitura mais provável neste projeto — a referência certa para repasse cheio
+   é o boxe de projeções locais de março de 2026, com cerca de 0,06 para os núcleos e 0,10 para o
+   IPCA cheio em doze meses.
+
+**E o achado que muda o teste de aceitação.** Três resultados primários e independentes mostram
+que uma regressão agregada de série temporal **não identifica a inclinação**: Mavroeidis,
+Plagborg-Moller e Stock (JEL 2014, mais de seiscentas mil especificações, estimativas
+simetricamente dispersas em torno de zero); McLeay e Tenreyro (o MQO converge para a inclinação
+da regra de metas, com sinal oposto ao verdadeiro); Hazell, Herreno, Nakamura e Steinsson (QJE
+2022, sinal errado no painel estadual sem efeitos fixos de tempo).
+
+Portanto **o teste nao fixa inclinacao**. Fixa identidades de construcao, a verticalidade valendo
+por construcao, ordenamentos publicados — repasse menor nos nucleos que no cheio, executavel
+hoje — e dominio preditivo sobre "use o Focus e pronto". Um coeficiente de folga com sinal errado
+numa celula da grade e o resultado modal esperado, e nao evidencia de defeito; sinal errado em
+**todas** as celulas e, porque indica convencao de sinal invertida.
+
+O documento completo, com equacoes, fontes e URLs, esta em `docs/referencias/phillips.md`.
+
+### B2. Sticky/flex CPI brasileiro — RESOLVIDA por decisao do mantenedor
+
+Adotada a divisao **livres contra administrados do proprio Banco Central**. E observavel,
+defensavel e reproduzivel, ao contrario de uma classificacao por frequencia de reajuste que
+exigiria microdado que o Brasil nao publica.
+
+**Consequencia que a decisao carrega: o indice muda de nome.** O resultado nao e um sticky-price
+CPI no sentido do Fed de Atlanta, e sim uma decomposicao administrados contra livres. O pacote,
+o `model_id` e o texto passam a chamar isso pelo nome certo. O sticky de verdade fica para quando
+houver microdado, registrado como pergunta futura e nao como divida silenciosa.
+
+**Conveniencia**: as duas decisoes pedem as mesmas series. `bcb_sgs:11428` (livres) e
+`bcb_sgs:4449` (administrados) servem de dependente para a curva de Phillips e de insumo para a
+decomposicao. Verifiquei na API: ambas existem e comecam em **janeiro de 1991**, cobrindo a
+amostra estimavel inteira. Junto com elas vale coletar `10844` (servicos) e `4447`
+(comercializaveis), que habilitam os ordenamentos setoriais do teste.
+
+---
+
 ## Bloqueantes
 
 Estes eu não decido sozinho porque a escolha é sua, de economista, e muda o trabalho.
 
-### B1. Curva de Phillips: qual especificação?
-
-**Por que não decido:** experimentei duas e as duas são ruins, de maneiras que dizem algo.
-
-Mensal, inflação em 12 meses, expectativa do Focus, desemprego em nível, 161 meses de 2013:
-
-| | coef. | p |
-|---|---:|---:|
-| expectativa | 0,224 | 0,003 |
-| inflação defasada | 0,912 | 0,000 |
-| desemprego | +0,037 | 0,260 |
-
-O R² de 0,96 é ilusão: regredir a inflação de doze meses contra ela mesma um mês antes é quase
-uma identidade. O desemprego sai insignificante e com o sinal errado.
-
-Trimestral, inflação anualizada do trimestre, hiato do desemprego por filtro HP, 57 trimestres:
-
-| | coef. | p |
-|---|---:|---:|
-| expectativa | 2,386 | 0,000 |
-| inflação defasada | 0,030 | 0,766 |
-| hiato do desemprego | **+0,928** | 0,090 |
-
-Aqui γ_f + γ_b = 2,42, o que viola a verticalidade de longo prazo, e o hiato do desemprego entra
-com **sinal positivo** — mais desemprego, mais inflação.
-
-**As escolhas que mudam o resultado, e que são suas:**
-
-1. **Qual medida de folga.** Desemprego, hiato do produto, utilização da capacidade. A PNAD só
-   começa em 2012, o que dá 57 trimestres — pouco para separar folga de choque.
-2. **Qual inflação.** Cheia, núcleo (o catálogo tem três agora) ou preços livres. Para o Brasil
-   os administrados são um argumento forte para não usar a cheia.
-3. **Câmbio.** Uma curva de economia aberta sem repasse cambial é malespecificada, e o `fx_spot_usd@BR`
-   está na base. Isso pode ser o que explica o sinal errado do hiato: 2015 e 2021 tiveram
-   desemprego alto e inflação alta ao mesmo tempo, com o câmbio no meio.
-4. **Impor γ_f + γ_b = 1** ou deixar a soma livre como diagnóstico.
-
-**O que eu faria se você mandasse escolher:** núcleo por médias aparadas, hiato do produto pelo
-IBC-Br, repasse cambial com quatro defasagens, soma restrita a 1, e o teste de aceitação
-cobrando sinal e magnitude do repasse em vez de um número da folga. Mas essa é a análise em que
-o julgamento vale mais que a implementação, e enfiar uma especificação ruim num teste de
-aceitação a congela.
-
-### B2. Sticky/flex CPI brasileiro: qual classificação de itens?
-
-**Por que não decido:** o método do Fed de Atlanta separa os itens pela **frequência de reajuste
-de preço**, medida em microdados. Para o Brasil não existe equivalente publicado, e a
-classificação é a análise inteira: escolhida de um jeito, o índice mede rigidez; escolhida de
-outro, mede só os administrados.
-
-**As opções:** replicar a classificação americana por correspondência de itens da COICOP;
-adotar uma classificação da literatura brasileira; ou usar a divisão do próprio Banco Central
-entre livres e administrados, que é observável e defensável mas mede outra coisa.
-
-**O que eu faria:** a terceira, chamando o resultado pelo nome certo — administrados contra
-livres — e deixando o sticky de verdade para quando houver microdado. Mas isso muda o que o
-índice significa, e o nome importa.
+Nenhum por enquanto.
