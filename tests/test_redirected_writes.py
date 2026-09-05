@@ -93,7 +93,7 @@ def test_a_directory_that_is_not_redirected_is_left_alone(
 
 
 def test_reading_is_never_blocked(store: Store, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Inspecting a redirected copy is exactly how the split was diagnosed; only writing forks it."""
+    """Inspecting a redirected copy is how the split was diagnosed; only writing forks the base."""
     monkeypatch.setattr(store_module, "writes_are_redirected", lambda _p: True)
     assert store.read("observations").num_rows == 0
     assert store.manifest().run_id is not None or True
