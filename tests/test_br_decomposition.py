@@ -18,9 +18,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-statsmodels = pytest.importorskip("statsmodels.api")
-
 from econbase.catalog import Catalog
+
+statsmodels = pytest.importorskip("statsmodels.api")
 
 ROOT = Path(__file__).resolve().parents[1]
 FIX = ROOT / "tests" / "fixtures" / "analysis" / "br_ipca_decomposicao.csv"
