@@ -84,7 +84,13 @@ decisions:
 
 executors:
   - {name: "agent:claude", validated: true, notes: "arquiteto e integrador"}
-  - {name: "agent:jules", validated: true, notes: "WP-02b; não entregou WP-04e/04f, feitos por Claude"}
+  - name: "agent:jules"
+    validated: true
+    notes: >
+      WP-02b, conectores do Banco Central. Entregou também WP-04e e WP-04f, ambos passando nos
+      testes de aceitação (16/16 e 18/18) — verificado em 2026-09-05 rodando os testes da main
+      contra a implementação dele. Não foram mesclados porque Claude implementou os mesmos
+      pacotes em paralelo e mesclou primeiro: falha de despacho, não de execução.
   - {name: "agent:antigravity", validated: true, notes: "WP-02c e WP-02d"}
   - {name: "agent:ollama", validated: true, notes: "WP-02e; acerta conteúdo, erra formato"}
 
