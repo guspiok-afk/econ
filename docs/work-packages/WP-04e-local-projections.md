@@ -127,4 +127,38 @@ Se um teste parecer errado, diga no pull request em vez de mudá-lo.
 
 ## Resultado
 
-(preenchido pelo executor)
+Implementado e verificado pelo arquiteto, depois de o pacote ficar sem executor disponível.
+
+### Na fixture, 1961T1 a 2019T4
+
+| horizonte | produto | inflação | juro |
+|---:|---:|---:|---:|
+| 1 | +0,0906 | +0,2640 | +0,2047 |
+| 4 | −0,3455 | **+0,4861** | −0,0869 |
+| 8 | −0,8844 | +0,1812 | −0,5225 |
+| 10 | **−1,0156** | — | — |
+| 20 | −0,4062 | −0,4216 | −1,1658 |
+
+O erro-padrão do produto vai de 0,064 em h=1 para 0,284 em h=16: as bandas alargam com o
+horizonte, porque nada amarra os horizontes entre si.
+
+**As duas coisas que o pacote existia para mostrar se confirmam.** O price puzzle aparece aqui
+também, com pico de +0,49 contra +0,38 do VAR — logo não é artefato da matriz companheira. E o
+vale é mais fundo e mais cedo, −1,02 em h=10 contra −0,46 em h=14.
+
+### Ao vivo, 1999–2019, horizonte de 16, os dois países
+
+| | projeção local | VAR | inflação h1–h4 (PL) |
+|---|---|---|---:|
+| Estados Unidos | −3,5373 em h=16 | −0,2362 em h=16 | +0,4354 |
+| Brasil | −1,1712 em h=4 | −0,9349 em h=4 | +0,7122 |
+
+**No Brasil os dois estimadores concordam bem** — mesmo horizonte de vale, magnitudes próximas.
+**Nos Estados Unidos eles divergem por um fator de quinze**, e vale dizer por quê em vez de
+escolher o número mais bonito: com vinte anos de dados, a regressão de horizonte dezesseis usa
+cerca de sessenta observações, e a estimativa dispara sem voltar. É a fraqueza conhecida do
+estimador em horizonte longo com amostra curta, e é exatamente a informação que as bandas
+carregam.
+
+A leitura honesta é que a divergência diz respeito à amostra, não ao método: na fixture longa, com
+sessenta anos, os dois concordam em sinal em todos os horizontes testados.
