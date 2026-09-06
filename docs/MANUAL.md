@@ -10,7 +10,7 @@ indicação. Caminhos fixos: repositório em `C:\dev\econ`; dados em
 
 **Uma pasta por agente.** `C:\dev\econ` guarda a `main` e é a pasta de referência; cada agente
 em trabalho recebe uma árvore própria (`C:\dev\econ-<nome>`), criada com
-`C:\devgent-kit\scripts
+`C:\dev\agent-kit\scripts
 ew-worktree.ps1`. Nunca troque a branch de uma pasta que outro
 agente está usando: o checkout apaga do disco os arquivos dele no meio da tarefa.
 
