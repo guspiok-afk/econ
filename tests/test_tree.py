@@ -52,6 +52,9 @@ LOAD_BEARING = [
     "docs/MANUAL.md",
     "AGENTS.md",
     # the project's own memory
+    "roadmap.yml",
+    "tools/render_roadmap.py",
+    "tools/painel.css",
     "docs/QUESTIONS.md",
     "docs/referencias/phillips.md",
     ".pma/project.yaml",

@@ -322,6 +322,23 @@ modulos:
       Hoje o modelo RECUSA rodar o Brasil, e isso é o comportamento certo: com 55,3% da variação
       explicada pelo trimestre do ano, o nowcast seria o calendário.
 
+  # ---------------------------------------------------------------- F6, interface
+  - id: M050
+    fase: F6
+    nome: "Painel gerado a partir do roadmap"
+    estado: validado
+    depende_de: []
+    criterio_aceite: >
+      tools/render_roadmap.py lê roadmap.yml e .pma/project.yaml e escreve painel/econ.html
+      autocontido, sem edição manual; todo marco, lacuna aberta e decisão chega à página;
+      lacunas ordenadas por gravidade; conteúdo escapado; nada de placeholder por substituir.
+    preso_por: ["tests/test_render_roadmap.py", "tests/test_roadmap.py"]
+    nota: >
+      Primeiro pedaço da F6, e o que resolve o problema que motivou este arquivo: o painel foi
+      escrito à mão três vezes em dois dias e errou duas — uma fase entregue reportada como
+      pendente, e zero perguntas esperando o mantenedor na mesma hora em que uma bloqueante era
+      registrada. Um gerador tira essa deriva por construção: a página não tem outra fonte.
+
 lacunas:
   - id: C1
     gravidade: alta
@@ -464,10 +481,11 @@ backlog:
 
   - id: B02
     titulo: "Renderizador do painel a partir deste arquivo"
-    estado: proposta
+    estado: feito
     nota: >
-      Hoje o painel é um Artifact escrito à mão e este arquivo é lido por humano. O Projeto
-      Finanças já resolve isso com tools/render_roadmap.py. Só vale depois que o formato assentar.
+      Entregue em 06/09/2026 como M050. `uv run python tools/render_roadmap.py` escreve
+      painel/econ.html. O Artifact escrito à mão fica como está até alguém decidir republicá-lo
+      a partir daqui.
 
   - id: B03
     titulo: "Devolver a validacao do fator dinamico quando o PR 42 entrar"
