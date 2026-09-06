@@ -273,3 +273,45 @@ def test_values_equal_treats_nan_as_equal_and_uses_tiny_tolerance() -> None:
     a = pd.Series([1.0, float("nan"), 2.0, 3.0])
     b = pd.Series([1.0 + 1e-13, float("nan"), 2.5, None])
     assert list(pipeline.values_equal(a, b)) == [True, True, False, False]
+
+
+def test_a_vintage_that_vanishes_from_the_source_is_refused_not_absorbed() -> None:
+    """What happens if a source restates its own history, from an adversarial review.
+
+    `apply_vintages` merges on (period, realtime_start), so a stored row whose key stops being
+    sent is left exactly as it was -- open, if it was open. Should the source replace it with a
+    different `realtime_start` that is also open, the period ends up with two open intervals,
+    which is not a state the bitemporal model admits.
+
+    The review called this an irrecoverable break. It is the opposite: `check_invariants` runs
+    before anything is returned, so the run refuses and the atomic manifest swap leaves the store
+    untouched. The cost is availability, not corruption -- that one series stops updating until
+    someone looks -- and a loud stop is the right failure for a history that cannot be refetched.
+    """
+    stored = pd.DataFrame(
+        {
+            "series_id": ["x"],
+            "period": [dt.date(2020, 1, 1)],
+            "value": [1.0],
+            "realtime_start": [dt.date(2022, 1, 1)],
+            "realtime_end": [None],
+            "observed_at": [pd.Timestamp("2022-01-01", tz="UTC")],
+            "run_id": ["r0"],
+        }
+    )
+    restated = pd.DataFrame(
+        {
+            "period": [dt.date(2020, 1, 1)],
+            "value": [2.0],
+            "realtime_start": [dt.date(2022, 2, 1)],
+            "realtime_end": [None],
+        }
+    )
+    with pytest.raises(ValueError, match="more than one open row"):
+        pipeline.apply_vintages(
+            stored,
+            restated,
+            series_id="x",
+            run_id="r1",
+            observed_at=pd.Timestamp("2026-09-06", tz="UTC"),
+        )

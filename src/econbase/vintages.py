@@ -60,24 +60,32 @@ def published_at(period: dt.date, spec: SeriesSpec) -> dt.date | None:
 def availability(frame: pd.DataFrame, spec: SeriesSpec) -> Availability:
     """Read from the stored rows whether this series carries real vintages.
 
-    The catalog already declares it: a source that publishes real-time periods carries
-    ``params: {vintages: true}``, which is how the connector was told to fetch them. That
-    declaration is the answer, and inferring one from the rows instead would be guessing — a
-    vintaged series whose recorded rows happen to share a collection date looks un-vintaged, and
-    a fixture is exactly where that happens.
+    Only the catalog decides. A source that publishes real-time periods carries
+    ``params: {vintages: true}``, which is how the connector was told to fetch them, and a series
+    the catalog says nothing about is treated as having none.
 
-    The row count is kept only as a fallback for a series the catalog says nothing about: many
-    distinct ``realtime_start`` values cannot arise from a single collection.
+    An earlier version kept a fallback for the undeclared case: more than one distinct
+    ``realtime_start`` could not, it reasoned, come from a single collection. That was wrong, and
+    wrong in the direction that fails silently. Every daily run writes the periods it newly finds
+    with today's date, so an ordinary daily series accumulates a new ``realtime_start`` every day
+    it runs — ``bcb_sgs:432`` had three after three days. The count then read routine collection
+    as evidence of revision history, ``mixed`` resolved to ``true``, the store was asked for a
+    2024 vintage that does not exist, and the answer came back **empty with no error**: precisely
+    the failure this module was written to end, rebuilt through a side door. Found by an
+    adversarial review, and it was already live.
+
+    Guessing wrong toward ``pseudo`` costs a simulation where a real history existed. Guessing
+    wrong toward ``true`` costs an empty panel that looks like a modelling result. The asymmetry
+    decides: absent a declaration, there are no true vintages.
     """
     if frame.empty:
         return Availability(
-            spec.series_id, _declares_vintages(spec) or False, None, spec.expected_lag_days
+            spec.series_id, bool(_declares_vintages(spec)), None, spec.expected_lag_days
         )
     starts = pd.to_datetime(frame["realtime_start"]).dt.date
-    declared = _declares_vintages(spec)
     return Availability(
         series_id=spec.series_id,
-        has_true_vintages=declared if declared is not None else starts.nunique() > 1,
+        has_true_vintages=bool(_declares_vintages(spec)),
         earliest_known=starts.min(),
         expected_lag_days=spec.expected_lag_days,
     )

@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 
 from econbase.api import Api, ApiError
+from econbase.pipeline import _period_end
 from econbase.vintages import (
     Availability,
     VintageError,
@@ -100,12 +101,24 @@ def test_the_catalog_declaration_decides() -> None:
     assert not availability(frame, Spec(vintages=False)).has_true_vintages
 
 
-def test_without_a_declaration_repeated_start_dates_are_the_fallback() -> None:
+def test_without_a_declaration_there_are_no_true_vintages_whatever_the_rows_look_like() -> None:
+    """The heuristic that used to live here was live-wrong, and wrong in the silent direction.
+
+    It read "more than one distinct realtime_start" as revision history. But every daily run
+    stamps the periods it newly finds with today's date, so an ordinary daily series grows a new
+    realtime_start every day it collects: `bcb_sgs:432` had three after three days. That made
+    `mixed` resolve to `true`, ask the store for a 2024 vintage that never existed, and return an
+    empty frame with no error — the exact failure this module exists to end.
+
+    Guessing toward `pseudo` costs a simulation where a real history existed. Guessing toward
+    `true` costs an empty panel that reads as a modelling result. Only the catalog decides now.
+    """
     one_collection = rows(["2024-01-01", "2024-02-01"])
     assert not availability(one_collection, Spec()).has_true_vintages
 
-    revised = rows(["2024-01-01", "2024-01-01"], ["2024-02-15", "2024-03-15"])
-    assert availability(revised, Spec()).has_true_vintages
+    looks_revised = rows(["2024-01-01", "2024-01-01"], ["2024-02-15", "2024-03-15"])
+    assert not availability(looks_revised, Spec()).has_true_vintages
+    assert availability(looks_revised, Spec(vintages=True)).has_true_vintages
 
 
 def test_the_usable_kind_follows_from_what_exists() -> None:
@@ -175,10 +188,39 @@ def test_a_panel_can_mix_the_two_kinds(loaded: Api) -> None:
 
 
 def test_no_simulated_row_could_have_been_unknown(loaded: Api) -> None:
-    """The guarantee the whole exercise rests on, checked rather than asserted in prose."""
+    """Rewritten after a review called the first version circular, correctly.
+
+    It used to take the rows `pseudo_asof` returned and assert `published_at(period) <= asof` —
+    the very condition the function had just filtered on. Break `published_at` (flip the sign of
+    the lag, or have it always answer 1900-01-01) and the function returns corrupted rows while
+    the test cheerfully re-derives the same broken arithmetic and passes.
+
+    The claim is now checked against something the function does not compute: the calendar. A
+    monthly period cannot be known before the month it covers has even ended.
+    """
     everything = loaded.get("govt_yield_10y", entity="US")
     asof = list(everything["period"])[len(everything) // 2]
-    spec = loaded.resolve("govt_yield_10y", "US").spec
     out = loaded.get("govt_yield_10y", entity="US", asof=asof, vintage_kind="pseudo")
+
+    assert not out.empty
+    spec = loaded.resolve("govt_yield_10y", "US").spec
     for period in out["period"]:
-        assert published_at(period, spec) <= asof
+        assert period <= asof, "a period cannot begin after the date it is claimed to be known"
+        assert _period_end(period, spec.freq) <= asof, "nor can it still be running"
+
+
+def test_a_daily_series_collected_for_three_days_is_not_mistaken_for_a_vintaged_one() -> None:
+    """The live bug, in the shape it actually took.
+
+    `bcb_sgs:432` is collected every day and every run stamps the newly found periods with that
+    day's date. Three days of ordinary operation gave it three distinct `realtime_start` values,
+    the old heuristic read that as revision history, and asking the Brazilian policy rate as of
+    June 2024 came back as zero rows with no error.
+    """
+    three_days = rows(
+        ["2026-09-04", "2026-09-05", "2026-09-06"],
+        ["2026-09-04", "2026-09-05", "2026-09-06"],
+    )
+    have = availability(three_days, Spec(freq="D", lag=1))
+    assert not have.has_true_vintages
+    assert have.usable_kind == "pseudo", "pseudo answers; true would have returned nothing"
