@@ -117,6 +117,21 @@ comment on the issue instead of editing it.
 - **Heavy compute** (Bayesian DSGE, DFM backtest loops, BVAR): Google Colab reading Parquet
   from the Google Drive backup of the maintainer, not the laptop.
 
+### Dispatched work is dispatched
+
+Once a WP goes to an executor, do **not** implement it in parallel. On 2026-09-05 I sent WP-04e
+and WP-04f to Jules and wrote both myself while waiting; his arrived one and four minutes after
+my branches and I merged mine six minutes later without checking. Both of his passed every
+acceptance test (16/16 and 18/18), and his guard against estimating more parameters than there
+are observations was better than mine — mine returned a coefficient from a rank-deficient
+design, which is the exact class of silent defect this whole review process exists to catch.
+
+The cost is not only wasted work. Racing an executor produces a false reading of what it can
+do, and that reading is what the routing table above is made of.
+
+If a dispatched WP has to be taken back, close the loop explicitly: say so on the issue, and
+check for an open PR before merging your own.
+
 ## 6. Engineering conventions
 
 - Python `>=3.13`, developed on 3.14. Environment and locking with `uv` only
