@@ -106,7 +106,10 @@ indexed by name, impulse responses by horizon, fitted values by period. Exactly 
 - `freq` lives on the series row. Resampling takes an explicit aggregation
   (`last | mean | sum | eop | compound`) and never guesses. Rates of change take
   `compound`: they do not add, and adding them is wrong by more than a rounding error.
-- `Store` and `api` return `pyarrow.Table`; pandas conversion happens at the edge.
+- `Store` returns `pyarrow.Table`. `api.get` returns **pandas by default** and Arrow only
+  with `as_pandas=False`; `api.get_panel` always returns a pandas DataFrame, because a panel
+  is indexed by period and Arrow has no index. Documenting the read API as Arrow-first was
+  wrong about the code every model in this repository is written against.
 - Asset prices (OHLCV) will NOT be forced into `observations`; they get their own physical
   tables when the first instrument is ingested (ADR-0005). The `table` field on the catalog
   entry is the dispatch seam.

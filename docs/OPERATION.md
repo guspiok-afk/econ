@@ -54,12 +54,22 @@ Logs com mais de 60 dias são apagados sozinhos.
 
 ```powershell
 cd C:\dev\econ
-uv run python -c "
-from econbase.store import Store; from econbase.settings import get_settings; from econbase import schemas
+@'
+from econbase.store import Store
+from econbase.settings import get_settings
+from econbase import schemas
 s = Store(get_settings().data_dir)
-print(schemas.to_pandas(s.read('runs')).tail(5).to_string(index=False))
-print(schemas.to_pandas(s.query(\"SELECT series_id, error FROM run_series WHERE error IS NOT NULL ORDER BY run_id DESC LIMIT 10\")).to_string(index=False))"
+print(schemas.to_pandas(s.read("runs")).tail(5).to_string(index=False))
+sql = "SELECT series_id, error FROM run_series WHERE error IS NOT NULL ORDER BY run_id DESC LIMIT 10"
+print(schemas.to_pandas(s.query(sql)).to_string(index=False))
+'@ | uv run python -
 ```
+
+> O código vai por `stdin`, não como argumento de `python -c`. O PowerShell 5.1 **remove as
+> aspas duplas** ao repassar argumentos para um executável nativo, então tanto `"..."` quanto
+> `'...'` chegam ao Python quebrados — a segunda forma foi testada aqui e falhou igual. O
+> here-string `@'...'@` é literal e não passa pelo parser de argumentos. O `'@` de fechamento
+> tem de estar na coluna zero.
 
 **Sintomas e causas:**
 

@@ -19,7 +19,7 @@ The full design lives in `docs/` (CONTRACT.md, IDENTIFIERS.md, adr/). Read the r
 before touching the area it covers.
 
 **Where the process lives.** The operating half of this file — sections 4, 5 and 7, and the
-general part of 6 and 8 — was extracted into a reusable kit at `C:\devgent-kit` once all
+general part of 6 and 8 — was extracted into a reusable kit at `C:\dev\agent-kit` once all
 four executors had delivered a package here. That kit is the version other projects copy; this
 file is its instance, plus everything specific to `econ`. A change to the *process* belongs in
 both; a change to the *project* belongs only here.
@@ -126,7 +126,9 @@ comment on the issue instead of editing it.
 - Tests: `pytest`. No network in tests: connectors are tested against recorded HTTP
   responses (`respx`) stored under `tests/fixtures/`. Store tests use a temp
   `ECONBASE_DATA_DIR`.
-- `Store` and `api` return `pyarrow.Table` by default; convert to pandas at the edge.
+- `Store` returns `pyarrow.Table`. `api.get` returns pandas by default (`as_pandas=False`
+  for Arrow) and `api.get_panel` always returns pandas: a panel has a period index and Arrow
+  has none. Keep Arrow at the storage edge, not at the read API.
 - Connectors implement `Source.fetch_raw(spec, since) -> RawResponse` (the bytes, unparsed)
   and `Source.parse(raw, spec) -> long DataFrame`. The pipeline archives the raw response
   before parsing, so never parse inside `fetch_raw`. Requests go through the shared HTTP
