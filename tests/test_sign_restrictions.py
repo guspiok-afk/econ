@@ -214,3 +214,15 @@ def test_a_monthly_panel_is_refused_before_any_arithmetic() -> None:
 def test_the_model_asks_for_concepts_so_it_runs_on_any_country() -> None:
     needs = {r.concept for r in SignRestrictedVAR(entity="BR").requires}
     assert needs == {"cpi_headline_index", "gdp_real", "policy_rate"}
+
+
+def test_the_sample_guard_counts_the_observations_the_lags_consume() -> None:
+    """Taken from Jules' implementation of this package, which measured the effective sample.
+
+    Mine compared the raw row count against the parameter count, so a sample that the lags left
+    too short reached statsmodels anyway and failed inside a Cholesky decomposition with
+    "Matrix is not positive definite" -- true, useless, and nothing a reader can act on.
+    """
+    short = us_panel()[:48]
+    with pytest.raises(ValueError, match=r"(?i)effective sample"):
+        SignRestrictedVAR(entity="US", lags=12, horizon=8, draws=200).fit(short, ctx())
