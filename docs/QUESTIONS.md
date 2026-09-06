@@ -170,14 +170,6 @@ amostra estimavel inteira. Junto com elas vale coletar `10844` (servicos) e `444
 
 ---
 
-## Bloqueantes
-
-Estes eu não decido sozinho porque a escolha é sua, de economista, e muda o trabalho.
-
-Nenhum por enquanto.
-
----
-
 ## Para conversar depois
 
 Nada aqui bloqueia trabalho. São escolhas onde a sua leitura de economista muda o que eu construo,
@@ -218,3 +210,11 @@ de trabalho em vez de hiato do produto — inclusive uma Phillips com desemprego
 motivo está escrito na L05. E há um aviso que vale repetir: sete de catorze títulos adicionados
 numa leva anterior estavam errados na primeira tentativa. Tabela e variável do SIDRA vão ser
 confirmadas antes de qualquer entrada nova, e não adivinhadas.
+
+---
+
+## Bloqueantes
+
+Estes eu não decido sozinho porque a escolha é sua, de economista, e muda o trabalho.
+
+Nenhum por enquanto.

@@ -233,22 +233,6 @@ def test_an_empty_panel_request_is_refused(loaded: Api) -> None:
         loaded.get_panel([])
 
 
-# ---------------------------------------------------------------------------- metadata
-def test_describe_carries_what_a_modeller_needs_to_know(loaded: Api) -> None:
-    info = loaded.describe("gdp_real", "US")
-    assert info["series_id"] == "fred:GDPC1"
-    assert info["freq"] == "Q" and info["seasonal_adj"] is True
-    assert info["redistributable"] is False, "licence travels with the series"
-    assert info["first_period"] == dt.date(2024, 1, 1)
-    assert info["last_period"] == dt.date(2024, 10, 1)
-
-
-def test_connect_opens_the_real_catalog(data_dir: Path) -> None:
-    api = connect("catalog")
-    assert "fred:GDPC1" in api.catalog.series
-    assert api.store.data_dir == data_dir.resolve()
-
-
 # ------------------------------------------------------------------ qual vintage cada coluna usou
 def test_a_panel_carries_which_vintage_each_column_used(loaded: Api) -> None:
     """A divisão existia em `describe_split` e não chegava a quem lê o painel.
@@ -303,3 +287,19 @@ def test_latest_never_counts_as_a_mixture(loaded: Api, recwarn) -> None:
         agg="mean",
     )
     assert not [w for w in recwarn if issubclass(w.category, VintageMixWarning)]
+
+
+# ---------------------------------------------------------------------------- metadata
+def test_describe_carries_what_a_modeller_needs_to_know(loaded: Api) -> None:
+    info = loaded.describe("gdp_real", "US")
+    assert info["series_id"] == "fred:GDPC1"
+    assert info["freq"] == "Q" and info["seasonal_adj"] is True
+    assert info["redistributable"] is False, "licence travels with the series"
+    assert info["first_period"] == dt.date(2024, 1, 1)
+    assert info["last_period"] == dt.date(2024, 10, 1)
+
+
+def test_connect_opens_the_real_catalog(data_dir: Path) -> None:
+    api = connect("catalog")
+    assert "fred:GDPC1" in api.catalog.series
+    assert api.store.data_dir == data_dir.resolve()
