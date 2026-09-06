@@ -37,6 +37,7 @@ LOAD_BEARING = [
     "src/econbase/settings.py",
     "src/econbase/transforms.py",
     "src/econbase/api.py",
+    "src/econbase/vintages.py",
     "src/econbase/report.py",
     # the model contract and everything built on it
     "src/econmodels/base.py",
@@ -45,6 +46,7 @@ LOAD_BEARING = [
     "src/econmodels/parity.py",
     "src/econmodels/taylor.py",
     "src/econmodels/var.py",
+    "src/econmodels/dfm.py",
     # operations
     "scripts/daily.ps1",
     "scripts/backup.ps1",
