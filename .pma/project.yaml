@@ -28,11 +28,12 @@ phases:
   - {id: "08", title: "Interface funcional sobre a base e os modelos", state: todo}
 
 delivered:
-  window: 2026-09-03 a 2026-09-05 (3 dias corridos)
+  window: 2026-09-03 a 2026-09-06 (4 dias corridos)
   merged_prs: 31
-  tests: 604
-  series: 73          # BR 42, US 30, global 1; 33 não redistribuíveis
-  models: 8           # phillips, taylor, parity, var, sign_restrictions, local_projections, dfm, results
+  tests_on_main: 573
+  tests_with_open_prs: 609       # +5 no PR 43, +31 neste
+  series: 73                     # BR 42, US 30, global 1; 33 não redistribuíveis
+  models: 8
   adrs: 7
   work_packages: 17
   specs: 2
@@ -40,6 +41,15 @@ delivered:
     Fases 1 a 4 fechadas e a 5 aberta. As horas do plano eram de um desenvolvedor só; a execução
     saiu comprimida porque vários agentes rodam em paralelo. O gargalo passou a ser revisão e
     verificação ao vivo, não escrita de código.
+
+awaiting_review:
+  - {pr: 42, title: "Fator dinâmico de frequência mista (WP-05a)", ci: verde, conflitos: nenhum}
+  - {pr: 43, title: "Guardas de estimação adotadas do Jules", ci: verde, conflitos: nenhum}
+
+capacity:
+  note: >
+    Cota semanal do assinante em 99% no dia 6 de setembro, com reinício em 9 de setembro às 5h.
+    O calendário passa a assumir que a semana de trabalho começa dia 9, não dia 7.
 
 blockers:
   - id: C1
