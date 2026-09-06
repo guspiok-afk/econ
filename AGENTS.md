@@ -117,6 +117,31 @@ comment on the issue instead of editing it.
 - **Heavy compute** (Bayesian DSGE, DFM backtest loops, BVAR): Google Colab reading Parquet
   from the Google Drive backup of the maintainer, not the laptop.
 
+### Antigravity headless (`agy`, via the PMA): adversarial review of one module
+
+Separate from Antigravity in the IDE. The `agy` CLI runs sandboxed through
+`pma agy despachar`, and on 2026-09-06 it earned a place here: reviewing `econmodels/dfm.py` it
+found that the backtest was being handed the target of the quarter it claimed to be nowcasting,
+which no test of mine had caught and which made the published numbers meaningless. Four of six
+areas produced real findings, one of them serious.
+
+Three hard limits, all found by hitting them:
+
+- **It cannot read files.** In headless mode the read tool needs a `command` permission that
+  cannot be prompted for, and is auto-denied — `read_file` inside its own working directory
+  included. Ship the code inside the prompt. Never work around this with
+  `--dangerously-skip-permissions`, which the dispatch module refuses by design.
+- **About 7k tokens of context per call**, because the prompt goes as an argv and Windows caps a
+  command line near 32k characters. One module and its tests fit; a whole package does not.
+- **Not cheap and not fast**: a module review cost 6m33s and 66.8k tokens, 44k of them thinking.
+  A shorter analytical question cost 95s and 24k. Batch the whole task into one call — a trivial
+  "oi" already costs ~14.9k input tokens of system prompt, so conversation is the expensive shape.
+
+So: **second pair of eyes on one file, never the decider.** Asked to choose a weekly-period
+convention it recommended normalising a stock-measured-on-a-date the same way as a weekly flow,
+which is wrong about the economics. It reads and analyses; it does not write files or run tests,
+so anything needing a green suite still goes to Jules.
+
 ## 6. Engineering conventions
 
 - Python `>=3.13`, developed on 3.14. Environment and locking with `uv` only
