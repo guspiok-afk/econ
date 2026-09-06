@@ -9,8 +9,8 @@ day it lands.
 
 What the factor buys is measured in ``docs/work-packages/WP-05a-dfm.md`` and is narrower than
 the headline suggests. Over 2018-2025 it cuts the root mean squared error of United States
-quarterly growth from 2.07 to 0.79 against the unconditional mean. Over the calm years since
-2022 it scores 0.49 against 0.42 -- a loss. The gain is concentrated where a common shock moves
+quarterly growth from 2.07 to 0.82 against the unconditional mean. Over the calm years since
+2022 it scores 0.50 against 0.42 -- a loss. The gain is concentrated where a common shock moves
 everything at once, which is where a common factor is the right object and where a mean is
 worst; outside of that, quarterly growth at this horizon is close to unforecastable. Both
 figures travel together in the acceptance tests, so the first cannot circulate on its own.
@@ -162,8 +162,19 @@ class DynamicFactorNowcast:
                 f"{self.target}@{self.entity} has no observations in this panel, so there is "
                 "nothing to nowcast. Ask get_panel for it with mixed_freq=True."
             )
-        quarterly = _stationary(observed, self.target).to_frame(self.target)
-        quarterly.index = pd.PeriodIndex(quarterly.index, freq="Q")
+        # onto a complete quarterly grid *before* differencing. Dropping the empty quarters first
+        # and differencing what is left computes growth straight across a hole and books it to
+        # one quarter: with 2024Q2 missing, the 2024Q3 figure would be the change since 2024Q1.
+        grid = pd.period_range(
+            pd.Period(observed.index.min(), freq="Q"),
+            pd.Period(observed.index.max(), freq="Q"),
+            freq="Q",
+        )
+        on_grid = pd.Series(
+            observed.to_numpy(dtype="float64"),
+            index=pd.PeriodIndex(observed.index, freq="Q"),
+        ).reindex(grid)
+        quarterly = _stationary(on_grid, self.target).to_frame(self.target)
         monthly.index = pd.PeriodIndex(monthly.index, freq="M")
         # the first row of every differenced column is empty by construction
         return monthly.iloc[1:], quarterly.iloc[1:]
@@ -213,6 +224,11 @@ class DynamicFactorNowcast:
         last_month = monthly.index[-1]
         quarter_end = last_month.asfreq("Q").asfreq("M", "end")
         horizon = max(last_month, quarter_end)
+        # a panel ending exactly on the closing month of an already published quarter has no
+        # quarter left to nowcast, and used to return a table whose last row was `observed`.
+        # The question a caller is asking is always about the quarter after the last one known.
+        if last_month == quarter_end and last_month.asfreq("Q") in set(quarterly.dropna().index):
+            horizon = (last_month.asfreq("Q") + 1).asfreq("M", "end")
         predicted = fitted.get_prediction(start=monthly.index[0], end=horizon).predicted_mean[
             self.target
         ]

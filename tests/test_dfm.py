@@ -43,14 +43,32 @@ def full_panel() -> pd.DataFrame:
     return raw.add_suffix("@US")
 
 
+#: Days after a quarter ends before the first estimate of GDP exists. The advance estimate lands
+#: about a month later, and the number only has to be roughly right: what it must not be is zero.
+GDP_LAG_DAYS = 30
+
+
 def visible_through(month: str) -> pd.DataFrame:
     """The panel as it would have looked at the end of ``month``.
 
-    A simplification: every indicator is treated as equally timely, where the real store applies
-    a per-series publication lag. That lag is exercised against the store in `test_vintages.py`;
-    what these tests need is a panel whose bottom is a known date.
+    Cutting the rows is not enough, and getting that wrong invalidated every backtest number in
+    the first version of this package. A quarterly series sits on the grid at the month the
+    quarter **starts** -- 2018-01-01 carries 2018Q1 -- so truncating at March 2018 keeps a figure
+    the Bureau does not publish until late April. The backtest then reported an in-sample fitted
+    value for the quarter it claimed to be nowcasting, and compared it against an out-of-sample
+    mean. Found by an adversarial review, not by me.
+
+    So the target is also blanked wherever the quarter had not yet been published: it counts as
+    known only once the quarter has ended and the lag has passed. The monthly indicators are
+    still treated as equally timely, which is a simplification; the real per-series lag is
+    exercised against the store in `test_vintages.py`.
     """
-    return full_panel().loc[:month]
+    panel = full_panel().loc[:month].copy()
+    asof = pd.Timestamp(month) + pd.offsets.MonthEnd(0)
+    quarter_end = pd.PeriodIndex(panel.index, freq="Q").to_timestamp(how="end").normalize()
+    published = quarter_end + pd.Timedelta(days=GDP_LAG_DAYS)
+    panel.loc[published > asof, "gdp_real@US"] = np.nan
+    return panel
 
 
 def fit(panel: pd.DataFrame, **kwargs):
@@ -127,12 +145,12 @@ def test_every_input_declares_how_it_was_made_stationary(fitted) -> None:
 def test_an_unobserved_quarter_was_estimated_without_its_own_target() -> None:
     """The half of the guarantee this model owns.
 
-    Erasing a quarter's target value must change that quarter's nowcast. If it did not, the
-    figure reported for an unpublished quarter would be an echo of the value the model had
-    already been shown — the silent failure that makes a backtest look good for the one reason
-    that disqualifies it.
+    Erasing a quarter's target value must change that quarter's estimate, **and** the estimate
+    that comes back must not be the erased value. The weaker half alone -- that deleting the
+    answer changes the output -- is what an adversarial review called tautological, and it was
+    right: a model that simply echoed the target would satisfy it.
     """
-    panel = visible_through("2024-06")
+    panel = visible_through("2024-09")  # 2024Q2 ended in June and is published by September
     blinded = panel.copy()
     blinded.loc[blinded.index >= pd.Timestamp("2024-04-01"), "gdp_real@US"] = np.nan
 
@@ -140,13 +158,19 @@ def test_an_unobserved_quarter_was_estimated_without_its_own_target() -> None:
     blind = fit(blinded)
     assert bool(seeing.tables()["nowcast"].set_index("quarter").loc["2024Q2", "is_observed"])
     assert not bool(blind.tables()["nowcast"].set_index("quarter").loc["2024Q2", "is_observed"])
-    assert nowcast_for(seeing, "2024Q2") != nowcast_for(blind, "2024Q2")
+
+    truth = 100.0 * np.log(full_panel()["gdp_real@US"].dropna()).diff()
+    truth.index = pd.PeriodIndex(truth.index, freq="Q")
+    realised = float(truth[pd.Period("2024Q2")])
+    estimate = nowcast_for(blind, "2024Q2")
+    assert estimate != nowcast_for(seeing, "2024Q2")
+    assert abs(estimate - realised) > 1e-6, "a blinded quarter must not come back as its own value"
 
 
 def test_the_indicators_still_carry_the_blinded_quarter() -> None:
     """And the estimate must not collapse to the sample mean when the target is hidden: the
     monthly block is what a nowcast is for."""
-    panel = visible_through("2024-06")
+    panel = visible_through("2024-09")
     blinded = panel.copy()
     blinded.loc[blinded.index >= pd.Timestamp("2024-04-01"), "gdp_real@US"] = np.nan
     stripped = blinded.copy()
@@ -314,3 +338,30 @@ def test_the_seasonal_share_separates_the_two_countries_by_a_mile() -> None:
         index=pd.period_range("1990Q1", periods=80, freq="Q"),
     )
     assert seasonal_share(noisy) < 0.25
+
+
+# ------------------------------------------------------------------ found by adversarial review
+def test_a_hole_in_the_target_does_not_become_one_quarters_growth() -> None:
+    """Dropping the empty quarters and differencing what is left computes growth straight across
+    the hole and books all of it to the quarter after it."""
+    panel = full_panel()
+    holed = panel.copy()
+    holed.loc[holed.index == pd.Timestamp("2024-04-01"), "gdp_real@US"] = np.nan
+
+    intact = nowcast_for(fit(panel), "2024Q3")
+    with_hole = nowcast_for(fit(holed), "2024Q3")
+    # the 2024Q3 figure must still be about one quarter, not about two
+    assert abs(with_hole - intact) < 1.0, (
+        f"a single missing quarter moved the next one from {intact:+.3f} to {with_hole:+.3f}"
+    )
+
+
+def test_a_panel_ending_on_a_published_quarter_still_nowcasts_the_next_one() -> None:
+    """A caller always asks about the quarter after the last one known. A panel that stops on the
+    closing month of a published quarter used to answer with that quarter, marked observed."""
+    panel = full_panel().loc[:"2024-09"]
+    panel.loc[panel.index > pd.Timestamp("2024-07-01"), "gdp_real@US"] = np.nan
+    table = fit(panel).tables()["nowcast"]
+    pending = table[table["status"] == "pending"]
+    assert len(pending) == 1
+    assert pending.iloc[0]["quarter"] == "2024Q4"

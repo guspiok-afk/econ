@@ -13,54 +13,45 @@ em agosto de 2026 o emprego já saiu e a produção industrial não, e o PIB do 
 ## O que já foi medido (antes de escrever o modelo)
 
 Painel EUA, oito indicadores mensais, PIB trimestral, amostra desde 1992,
-`DynamicFactorMQ(factors=1, factor_orders=1, idiosyncratic_ar1=True)`,
-backtest em tempo pseudo-real 2018Q1–2025Q4 com `vintage_kind="mixed"`, RMSE do crescimento
-trimestral em pontos percentuais:
+`DynamicFactorMQ(factors=1, factor_orders=1, idiosyncratic_ar1=True)`, backtest em tempo
+pseudo-real 2018Q1–2025Q4, RMSE do crescimento trimestral em pontos percentuais:
 
-| corte da amostra | n | DFM | média histórica | passeio aleatório |
-|---|---|---|---|---|
-| 2018–2025 completo | 32 | **0,794** | 2,067 | 3,484 |
-| excluindo 2020 | 28 | 0,510 | **0,482** | 0,651 |
-
-E o erro em função de quanto do trimestre já é visível (seis indicadores, mês do trimestre em
-que se pergunta):
-
-| as-of | observações visíveis no trimestre | RMSE completo | RMSE sem 2020 |
+| recorte | n | DFM | média incondicional |
 |---|---|---|---|
-| mês 1 | 0,9 | 1,588 | 0,619 |
-| mês 2 | 6,7 | 0,911 | 0,639 |
-| mês 3 | 12,8 | 0,810 | 0,667 |
-| mês 4 | 18,6 | 0,860 | 0,638 |
+| 2018–2025 completo | 32 | **0,818** | 2,065 |
+| sem 2020 | 28 | 0,466 | 0,477 |
+| 2018–2021 | 16 | 1,043 | 2,890 |
+| 2022–2025 (calmo) | 16 | 0,501 | **0,423** |
 
-E por subperíodo, medido depois que o primeiro recorte se mostrou instável (fixture, corte
-uniforme; a coluna "média" é a média incondicional recalculada a cada data):
+E o erro em função de quanto do trimestre já é visível (2018–2020):
 
-| recorte | n | DFM | média |
-|---|---|---|---|
-| 2018–2025 completo | 32 | **0,772** | 2,047 |
-| sem 2020 | 28 | 0,457 | 0,473 |
-| 2018–2021 | 16 | 0,974 | 2,865 |
-| 2022–2025 (calmo) | 16 | 0,493 | **0,420** |
+| as-of | RMSE |
+|---|---|
+| mês 1 | 8,261 |
+| mês 2 | 1,157 |
+| mês 3 | 1,166 |
+| mês 4 | 1,124 |
+
+> **Estes números substituem os primeiros que este documento publicou, que estavam
+> contaminados.** Uma série trimestral fica na grade no mês em que o trimestre **começa** —
+> 2018-01-01 carrega 2018Q1 — e o corte do backtest era por data de referência, então cortar em
+> março de 2018 mantinha um número que o BEA só publica no fim de abril. O modelo recebia o alvo
+> do trimestre que dizia estimar: `status` vinha `observed`, e o que era comparado contra a média
+> era ajuste dentro da amostra. Achado por revisão adversarial delegada ao Antigravity, não por
+> mim. Números antigos, para registro: 0,772 no recorte completo e 0,493 no calmo.
 
 **Leitura honesta destes números, que precisa acompanhar qualquer citação do primeiro quadro:**
 o ganho do fator dinâmico sobre a média incondicional vem do choque comum. Sobre a amostra
-completa ele corta o erro em 62%; nos anos calmos desde 2022 ele perde por 17%.
+completa ele corta o erro em 60%; nos anos calmos desde 2022 ele perde por 18%. A conclusão
+qualitativa sobreviveu à correção do vazamento, o que só se soube depois de remedir.
+
+Sobre o perfil dentro do trimestre: a queda é quase toda do mês 1 para o mês 2 (8,26 para 1,16),
+e depois disso o erro é plano. Não é acumulação suave de informação — é a diferença entre não
+ter nenhum indicador do trimestre e ter dois meses deles.
 
 O recorte "sem 2020" foi tentado primeiro e descartado: 2021 ainda é a recuperação, movida pelo
-mesmo choque, e o modelo ganha lá. Pior, o agregado sem 2020 **troca de sinal** conforme a regra
-de corte — na fixture, com todos os indicadores truncados no mesmo dia, o modelo fica à frente
-(0,457 contra 0,473); contra o store, com as defasagens reais de publicação por série, fica
-atrás (0,510 contra 0,482). Uma afirmação que inverte com a regra de truncamento não é uma
-afirmação. 2022–2025 está atrás nas duas.
-
-Dois fatores pioram (0,868 contra 0,794).
-
-Isso é consistente com a literatura: o ganho de um nowcast se concentra nas viradas, e o
-crescimento trimestral do PIB americano em período calmo é próximo de imprevisível neste
-horizonte. **O teste de aceitação não pode exigir que o modelo bata a média no período calmo.**
-Foi exatamente o erro cometido no pacote da Phillips — uma margem medida numa especificação e
-exigida de outra — e não se repete aqui. O teste fixa a vitória na amostra completa *e* a
-derrota no período calmo, para que nenhum dos dois circule sozinho.
+mesmo choque, e ele é instável demais para virar teste. **O teste de aceitação fixa a vitória na
+amostra completa e a derrota no período calmo**, para que nenhum dos dois circule sozinho.
 
 ## Contrato
 
