@@ -13,6 +13,7 @@ worth running.
 from __future__ import annotations
 
 import datetime as dt
+import warnings
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,17 @@ from econbase import schemas, transforms
 from econbase.catalog import Catalog, SeriesSpec
 from econbase.settings import Settings, get_settings
 from econbase.store import Store
-from econbase.vintages import VINTAGE_KINDS, VintageError, availability, pseudo_asof
+from econbase.vintages import (
+    VINTAGE_KINDS,
+    VintageError,
+    availability,
+    describe_split,
+    pseudo_asof,
+)
+
+
+class VintageMixWarning(UserWarning):
+    """Um painel cujas colunas não sabem o mesmo sobre a mesma data."""
 
 
 class ApiError(ValueError):
@@ -270,7 +281,30 @@ class Api:
         panel = panel.sort_index()
         panel.index = pd.DatetimeIndex(panel.index)
         panel.index.name = "period"
-        return _trim_index(panel, _as_date(start, "start"), _as_date(end, "end"))
+        panel = _trim_index(panel, _as_date(start, "start"), _as_date(end, "end"))
+
+        # Qual vintage cada coluna acabou usando, preso ao próprio painel.
+        #
+        # `mixed` resolve série a série, e num painel isso produz colunas que sabem coisas
+        # diferentes sobre o mesmo instante: uma série com vintages reais volta na versão crua da
+        # época, enquanto uma simulada volta com o valor de hoje, já revisado, retrodatado. A
+        # divisão existia em `describe_split` e não chegava a quem lê o painel — o que faz dela
+        # rótulo, não informação. Agora viaja com o dado, e um painel que mistura os dois avisa.
+        used = {
+            label: self._last_kind.get(self.resolve(k, ent).series_id, vintage_kind)
+            for k, ent, label in targets
+        }
+        panel.attrs["vintage_kinds"] = used
+        panel.attrs["vintage_split"] = describe_split(used)
+        if len({v for v in used.values() if v in ("true", "pseudo")}) > 1:
+            warnings.warn(
+                "este painel mistura vintages gravadas e simuladas "
+                f"({panel.attrs['vintage_split']}): as colunas não sabem o mesmo sobre a mesma "
+                "data. Ver panel.attrs['vintage_kinds'].",
+                VintageMixWarning,
+                stacklevel=2,
+            )
+        return panel
 
     # ------------------------------------------------------------------ metadata
     def series(self) -> pa.Table:

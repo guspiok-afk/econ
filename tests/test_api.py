@@ -15,7 +15,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from econbase.api import Api, ApiError, connect
+from econbase.api import Api, ApiError, VintageMixWarning, connect
+from econbase.vintages import VINTAGE_KINDS, describe_split
 
 FRED_FIX = Path(__file__).parent / "fixtures" / "fred"
 
@@ -246,3 +247,59 @@ def test_connect_opens_the_real_catalog(data_dir: Path) -> None:
     api = connect("catalog")
     assert "fred:GDPC1" in api.catalog.series
     assert api.store.data_dir == data_dir.resolve()
+
+
+# ------------------------------------------------------------------ qual vintage cada coluna usou
+def test_a_panel_carries_which_vintage_each_column_used(loaded: Api) -> None:
+    """A divisão existia em `describe_split` e não chegava a quem lê o painel.
+
+    Um rótulo que não viaja com o dado não é informação: quem escreve o relatório vê números e
+    não vê que metade deles é simulada.
+    """
+    panel = loaded.get_panel(
+        [("gdp_real", "US"), ("govt_yield_10y", "US")],
+        asof="2024-06-30",
+        vintage_kind="mixed",
+        freq="Q",
+        agg="mean",
+    )
+    kinds = panel.attrs["vintage_kinds"]
+    assert set(kinds) == {"gdp_real@US", "govt_yield_10y@US"}
+    assert set(kinds.values()) <= set(VINTAGE_KINDS)
+    assert panel.attrs["vintage_split"] == describe_split(kinds)
+
+
+def test_mixing_recorded_and_simulated_vintages_warns(loaded: Api) -> None:
+    """The incoherence an adversarial review named, and the reason this is a warning.
+
+    A column with real vintages comes back as it read at the time. A simulated one comes back
+    with today's value -- already revised -- back-dated. Side by side they do not know the same
+    thing about the same instant, and nothing in the numbers says so.
+    """
+    with pytest.warns(VintageMixWarning, match="não sabem o mesmo"):
+        loaded.get_panel(
+            [("gdp_real", "US"), ("govt_yield_10y", "US")],
+            asof="2024-06-30",
+            vintage_kind="mixed",
+            freq="Q",
+            agg="mean",
+        )
+
+
+def test_a_panel_of_one_kind_is_quiet(loaded: Api, recwarn) -> None:
+    """O aviso é sobre mistura. Um painel coerente não deve treinar ninguém a ignorá-lo."""
+    loaded.get_panel(
+        [("gdp_real", "US")], asof="2024-06-30", vintage_kind="true", freq="Q", agg="mean"
+    )
+    assert not [w for w in recwarn if issubclass(w.category, VintageMixWarning)]
+
+
+def test_latest_never_counts_as_a_mixture(loaded: Api, recwarn) -> None:
+    """`latest` ignora o as-of por desenho: não é vintage nenhuma, e não mistura nada."""
+    loaded.get_panel(
+        [("gdp_real", "US"), ("govt_yield_10y", "US")],
+        vintage_kind="latest",
+        freq="Q",
+        agg="mean",
+    )
+    assert not [w for w in recwarn if issubclass(w.category, VintageMixWarning)]

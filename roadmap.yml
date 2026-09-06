@@ -308,9 +308,14 @@ modulos:
   - id: M045
     fase: F4
     nome: "LMCI-BR por componentes principais"
-    estado: a_fazer
+    estado: bloqueado
     depende_de: [M011]
+    bloqueado_por: [L05]
     criterio_aceite: "~20 variáveis, com reestimações deixando uma de fora para medir dependência."
+    nota: >
+      Medido em 06/09/2026: o catálogo brasileiro tem UMA série de mercado de trabalho, a taxa de
+      desocupação (sidra:6381/4099, desde mar/2012). Um índice de condições construído sobre uma
+      variável não é um índice — é a variável com outro nome. Fica bloqueado até a L05.
 
   - id: M046
     fase: F4
@@ -378,13 +383,17 @@ lacunas:
   - id: L02
     gravidade: media
     titulo: "O modo `mixed` pode produzir um painel temporalmente incoerente"
-    onde: "src/econbase/api.py (_observations), src/econbase/vintages.py"
-    estado: aberta
+    onde: "src/econbase/api.py (get_panel), src/econbase/vintages.py"
+    estado: mitigada
     nota: >
       Uma série resolvida como `true` volta na versão crua da época; uma resolvida como `pseudo`
       volta com o valor ATUAL, já revisado, retrodatado. No mesmo painel, uma sabe menos que a
-      outra sobre o mesmo instante. describe_split relata a divisão, o que não basta: a
-      incoerência é do conceito, não do rótulo. Achado por revisão delegada em 06/09/2026.
+      outra sobre o mesmo instante. Achado por revisão delegada em 06/09/2026.
+      MITIGADA, não resolvida: o painel passou a carregar `attrs["vintage_kinds"]` e
+      `attrs["vintage_split"]`, e um painel que mistura gravada com simulada emite
+      `VintageMixWarning`. A incoerência continua existindo — ela é do conceito, não do rótulo —
+      mas deixou de ser invisível. Resolver de verdade exigiria ou recusar a mistura, ou
+      reconstruir a primeira divulgação das séries simuladas, que o dado não permite.
 
   - id: L03
     gravidade: baixa
@@ -394,6 +403,20 @@ lacunas:
     nota: >
       Pedir pseudo para uma série do FRED usa o valor corrente em vez das vintages gravadas.
       É o que foi pedido, mas merece aviso nas diagnósticas.
+
+  - id: L05
+    gravidade: media
+    titulo: "O Brasil tem uma única série de mercado de trabalho catalogada"
+    onde: "catalog/br/ibge_sidra.yaml"
+    estado: aberta
+    nota: >
+      Só a taxa de desocupação (sidra:6381/4099, desde mar/2012). Os conceitos `employment`,
+      `wages` e `labor_conditions_index` existem em concepts.yaml e nenhuma série brasileira os
+      carrega. Bloqueia o M045. O que falta é PNAD Contínua — população ocupada, taxa de
+      participação, rendimento real habitual, horas trabalhadas — e CAGED, admissões e
+      desligamentos. **Não catalogar por adivinhação:** sete de catorze títulos adicionados numa
+      leva anterior estavam errados na primeira tentativa, e identificador errado é invisível.
+      Confirmar tabela e variável no SIDRA antes de escrever a entrada.
 
   - id: L04
     gravidade: baixa
@@ -482,6 +505,9 @@ validacao:
 
   - regra: "As participações de uma decomposição somam exatamente 1, com a composição nomeada"
     fonte: "tests/test_decomposition.py::test_as_participacoes_somam_um_em_todo_periodo"
+
+  - regra: "Um painel que mistura vintage gravada com simulada avisa, e diz qual coluna é qual"
+    fonte: "tests/test_api.py::test_mixing_recorded_and_simulated_vintages_warns"
 
 backlog:
   - id: B01

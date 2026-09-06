@@ -24,6 +24,8 @@ ROADMAP = ROOT / "roadmap.yml"
 
 VALID_STATES = {"validado", "em_revisao", "a_fazer", "bloqueado", "abandonado"}
 SEVERITIES = {"alta", "media", "baixa"}
+#: `mitigada` diz que o sintoma foi contido e a causa não: honesto, e diferente de fechada.
+GAP_STATES = {"aberta", "mitigada", "despachada", "fechada"}
 
 
 @pytest.fixture(scope="module")
@@ -112,6 +114,23 @@ def test_a_blocked_milestone_names_what_blocks_it(roadmap) -> None:
 def test_every_gap_carries_a_severity(roadmap) -> None:
     unknown = {g["gravidade"] for g in roadmap["lacunas"]} - SEVERITIES
     assert not unknown, f"unknown severities: {unknown}"
+
+
+def test_gap_states_are_known_and_mitigated_is_not_closed(roadmap) -> None:
+    """`mitigada` is a state of its own on purpose.
+
+    L02 is the case that forced it: a panel mixing recorded and simulated vintages now warns and
+    labels every column, so the incoherence is visible -- and it is still there. Filing that as
+    `fechada` would be the comfortable lie; leaving it `aberta` would hide that the symptom was
+    contained. Neither is what happened.
+    """
+    unknown = {g.get("estado", "aberta") for g in roadmap["lacunas"]} - GAP_STATES
+    assert not unknown, f"unknown gap states: {unknown}"
+    mitigated = [g for g in roadmap["lacunas"] if g.get("estado") == "mitigada"]
+    for gap in mitigated:
+        assert "MITIGADA" in gap.get("nota", ""), (
+            f"{gap['id']} is filed as mitigated without saying what remains"
+        )
 
 
 def test_every_decision_says_when_it_would_be_reopened(roadmap) -> None:
