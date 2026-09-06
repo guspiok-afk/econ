@@ -168,6 +168,11 @@ series:
     freq: Q
     seasonal_adj: true
     expected_lag_days: 30
+    # as in catalog/us/fred.yaml: FRED publishes real-time periods for this series, and the
+    # declaration is the only thing that says so. The fixture used to omit it and pass anyway,
+    # on a row-count heuristic that has since been removed for reading routine daily collection
+    # as revision history.
+    params: {vintages: true}
   - native_id: DGS10
     concept_id: govt_yield_10y
     title: Ten-year Treasury constant maturity
