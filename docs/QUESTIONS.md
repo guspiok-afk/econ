@@ -175,3 +175,46 @@ amostra estimavel inteira. Junto com elas vale coletar `10844` (servicos) e `444
 Estes eu não decido sozinho porque a escolha é sua, de economista, e muda o trabalho.
 
 Nenhum por enquanto.
+
+---
+
+## Para conversar depois
+
+Nada aqui bloqueia trabalho. São escolhas onde a sua leitura de economista muda o que eu construo,
+e que ficam registradas para não virarem decisão minha por omissão.
+
+### T1. Mercado de trabalho brasileiro — o que catalogar, e de onde
+
+**O fato, medido em 06/09/2026:** o catálogo brasileiro tem **uma** série de mercado de trabalho,
+a taxa de desocupação (`sidra:6381/4099`, desde mar/2012). Os conceitos `employment`, `wages` e
+`labor_conditions_index` existem em `concepts.yaml` e nenhuma série brasileira os carrega. Isso
+bloqueia o LMCI-BR (marco M045, lacuna L05) e limita qualquer modelo que queira folga no mercado
+de trabalho em vez de hiato do produto — inclusive uma Phillips com desemprego no lugar do hiato.
+
+**O que existe para catalogar, e o problema de cada um:**
+
+- **PNAD Contínua** (SIDRA): população ocupada, taxa de participação, rendimento médio real
+  habitual, horas habitualmente trabalhadas, subutilização. É a fonte certa conceitualmente e
+  **começa em 2012**. Treze anos de amostra mensal em trimestre móvel: dá para um índice, não dá
+  para estimar relação estrutural com uma recessão só (2015-16) mais a pandemia.
+- **CAGED** (Ministério do Trabalho): admissões, desligamentos e saldo, mensal, desde os anos
+  noventa. Cobre só o emprego **formal celetista** — cerca de metade da ocupação brasileira — e
+  tem uma **quebra metodológica em 2020** com o Novo CAGED, que mudou a captação e o prazo de
+  declaração. Emendar as duas séries sem tratar a quebra produz um salto que parece economia.
+- **PME** (a antiga pesquisa mensal de emprego, seis regiões metropolitanas): cobre 2002-2016 e
+  encerrou. Serve para estender a série para trás ao custo de mudar o conceito no meio.
+
+**As três perguntas que preciso que você responda, e não são técnicas:**
+
+1. Vale um LMCI-BR sobre treze anos, ou a amostra curta o torna um exercício decorativo? A minha
+   inclinação é que vale como acompanhamento e não como insumo de modelo estrutural — mas quem
+   decide o que é decorativo aqui é você.
+2. Emendar PME com PNAD Contínua para ganhar dez anos, ou recusar a emenda? Emendar séries de
+   conceito diferente é o tipo de decisão que fica invisível seis meses depois.
+3. O CAGED entra apesar da quebra de 2020, e com que tratamento — série partida em duas, ajuste
+   estimado, ou só o pós-2020?
+
+**Enquanto não se decide, nada está errado em silêncio:** o M045 está marcado como bloqueado e o
+motivo está escrito na L05. E há um aviso que vale repetir: sete de catorze títulos adicionados
+numa leva anterior estavam errados na primeira tentativa. Tabela e variável do SIDRA vão ser
+confirmadas antes de qualquer entrada nova, e não adivinhadas.

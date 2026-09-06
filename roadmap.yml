@@ -283,8 +283,12 @@ modulos:
     criterio_aceite: >
       model_runs e model_outputs gravados com git_sha, seed e vintage_kind; o relatório distingue
       vintage real de simulada por série, sem agregar as duas num número só.
-    preso_por: ["tests/test_results_store.py"]
-    nota: "O store de resultados já existe; falta o backtest gravar nele."
+    nota: >
+      Sem `preso_por` porque nada o prende ainda, e isso é o estado honesto. A primeira versão
+      nomeava `tests/test_results_store.py`, que prende o STORE de resultados — uma dependência
+      já pronta — e não este marco. A guarda contra marco pendente com teste pronto pegou isso na
+      primeira execução dela, que é o mesmo engano do M044 aparecendo de novo: emprestar o teste
+      de um vizinho.
 
   - id: M044
     fase: F4
@@ -320,9 +324,20 @@ modulos:
   - id: M046
     fase: F4
     nome: "GSCPI ingerido"
-    estado: a_fazer
+    estado: validado
     depende_de: [M010]
-    criterio_aceite: "Planilha do NY Fed pelo conector de arquivo HTTP, com fixture gravada."
+    criterio_aceite: >
+      Planilha do NY Fed pelo conector de arquivo HTTP; entrada de catálogo declarando folha,
+      salto de cabeçalho e `period_is_end`; termos de uso declarados e redistribuição negada;
+      o formato do arquivo trancado por teste SEM copiar o dado.
+    preso_por: ["tests/test_source_nyfed.py"]
+    nota: >
+      Estava marcado como a fazer e já rodava: 344 observações de jan/1998 a ago/2026, atualizadas
+      pelo agendador. Terceiro marco que este arquivo descreveu de memória do plano em vez de do
+      repositório — ver B05.
+      A série é `redistributable: false`, então não há fixture com o dado, e a identidade que a
+      confirma fica medida em vez de testada: média 0,0077 e desvio 1,0013 sobre as 344
+      observações, porque o índice é padronizado na origem. Máximo em dez/2021, 4,431.
 
   - id: M047
     fase: F4
@@ -417,6 +432,9 @@ lacunas:
       desligamentos. **Não catalogar por adivinhação:** sete de catorze títulos adicionados numa
       leva anterior estavam errados na primeira tentativa, e identificador errado é invisível.
       Confirmar tabela e variável no SIDRA antes de escrever a entrada.
+      As três escolhas que dependem do mantenedor — amostra curta da PNAD, emenda com a PME, e a
+      quebra do CAGED em 2020 — estão em docs/QUESTIONS.md, item T1, para conversa e não como
+      bloqueio de execução.
 
   - id: L04
     gravidade: baixa
@@ -509,6 +527,9 @@ validacao:
   - regra: "Um painel que mistura vintage gravada com simulada avisa, e diz qual coluna é qual"
     fonte: "tests/test_api.py::test_mixing_recorded_and_simulated_vintages_warns"
 
+  - regra: "O roadmap não descreve como pendente um trabalho cujos testes já existem"
+    fonte: "tests/test_roadmap.py::test_a_milestone_still_to_do_does_not_already_have_its_tests"
+
 backlog:
   - id: B01
     titulo: "Interface funcional sobre a base e os modelos"
@@ -534,6 +555,18 @@ backlog:
       PR 42: o trimestre não observado estimado sem o próprio alvo, e o alvo sazonal recusado
       pelo nome. Voltam com a mesclagem. O teste que exige que toda fonte exista é o que obriga
       esta anotação a não virar dívida silenciosa.
+
+  - id: B05
+    titulo: "Marco marcado como a fazer que já está pronto: pegar isso automaticamente"
+    estado: feito
+    nota: >
+      Três vezes em 06/09/2026 este arquivo descreveu como pendente algo que já existia — M044,
+      M046 e a fase 8. A causa é sempre a mesma: escrevi de memória do plano e não do repositório.
+      A regra de `preso_por` só morde marco já validado, então nada olha para o outro lado.
+      Implementado no mesmo dia como
+      `test_a_milestone_still_to_do_does_not_already_have_its_tests`: marco em `a_fazer` cujos
+      testes de `preso_por` TODOS existem levanta suspeita. Não é prova, é sinalização — e é
+      barata, porque marco sem `preso_por` nem é olhado.
 
   - id: B04
     titulo: "Proteção de branch na main"

@@ -55,6 +55,7 @@ LOAD_BEARING = [
     "roadmap.yml",
     "tools/render_roadmap.py",
     "tools/painel.css",
+    "catalog/us/nyfed.yaml",
     "docs/QUESTIONS.md",
     "docs/referencias/phillips.md",
     ".pma/project.yaml",

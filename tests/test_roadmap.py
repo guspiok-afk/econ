@@ -64,6 +64,30 @@ def test_every_test_a_validated_milestone_names_exists(roadmap) -> None:
     assert not missing, f"validated milestones pointing at tests that are not there: {missing}"
 
 
+def test_a_milestone_still_to_do_does_not_already_have_its_tests(roadmap) -> None:
+    """The rule looking the other way, added after this file was wrong three times in a day.
+
+    `preso_por` catches a validated milestone whose tests are gone. Nothing caught the opposite:
+    a milestone described as pending whose work is already done and merged. On 6 September 2026
+    that happened to M044, to M046, and to the interface phase — every time because the roadmap
+    was written from memory of the plan rather than from the repository.
+
+    A milestone still `a_fazer` whose named tests all exist is not proof that it is finished, but
+    it is a strong enough smell to stop and look. Milestones with nothing named are untouched.
+    """
+    suspicious = [
+        m["id"]
+        for m in roadmap["modulos"]
+        if m["estado"] == "a_fazer"
+        and m.get("preso_por")
+        and all((ROOT / path).exists() for path in m["preso_por"])
+    ]
+    assert not suspicious, (
+        f"marked as still to do, but every test they name already exists: {suspicious}. "
+        "Either the work is done and the state is stale, or the tests belong to another milestone."
+    )
+
+
 def test_a_validation_rule_names_a_file_that_exists(roadmap) -> None:
     """The `validacao` section is the short list of claims this project makes about itself. Each
     one names the test that earns it."""
