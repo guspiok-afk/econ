@@ -190,3 +190,47 @@ def test_two_runs_of_the_same_specification_agree() -> None:
         b.tables()["irf"]["value"].to_numpy(),
         atol=1e-12,
     )
+
+
+# ------------------------------------------------------------------ guards taken from Jules
+def test_a_projection_with_fewer_observations_than_parameters_is_refused() -> None:
+    """The defect this replaced, measured on the sample that exposed it.
+
+    The guard used to be a fixed floor of twenty rows while the parameter count grows with the
+    lag order. At eight lags a projection estimates twenty-six coefficients, and thirty-eight
+    rows of panel leave twenty-two usable: it ran, warned about a rank-deficient design twelve
+    times, and returned -0.3986 for the output response. A number where there is no estimate.
+
+    Jules' implementation of this same work package scaled its guard with the parameters and
+    refused. Both versions passed every acceptance test I had written, which is what makes this
+    worth a test of its own.
+    """
+    short = us_panel()[:38]
+    with pytest.raises(ValueError, match=r"(?i)parameters|residual degrees"):
+        LocalProjections(entity="US", horizon=4, lags=8).fit(short, ctx())
+
+
+def test_the_guard_scales_with_the_lag_order() -> None:
+    """Same sample, fewer lags, and it estimates -- so the refusal is about identification and
+    not about the sample being short."""
+    short = us_panel()[:38]
+    result = LocalProjections(entity="US", horizon=4, lags=1).fit(short, ctx())
+    diag = result.tables()["diagnostics"].set_index("metric")["value"]
+    assert int(diag["n_params"]) == 2 + 1 * 3
+    assert int(result.tables()["irf"]["n_obs"].min()) > int(diag["n_params"])
+
+
+def test_horizon_zero_is_not_counted_as_a_regression() -> None:
+    """It is zero by construction. Estimating it returned the right number for the wrong reason
+    and reported one regression per response that never happened."""
+    result = LocalProjections(entity="US", horizon=4, lags=2).fit(us_panel(), ctx())
+    diag = result.tables()["diagnostics"].set_index("metric")["value"]
+    assert int(diag["regressions"]) == 4 * 3, "four horizons times three responses, not five"
+    zero = result.tables()["irf"].query("horizon == 0")
+    assert (zero["value"] == 0.0).all()
+    assert (zero["std_error"] == 0.0).all()
+
+
+def test_an_unknown_response_is_named_instead_of_raising_a_key_error() -> None:
+    with pytest.raises(ValueError, match="nonsense"):
+        LocalProjections(entity="US", responses=("output", "nonsense")).fit(us_panel(), ctx())

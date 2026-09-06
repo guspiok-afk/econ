@@ -32,8 +32,15 @@ from econmodels.base import (
     series_for,
 )
 
-#: Below this many usable rows a horizon's regression is not worth reporting.
-MIN_OBS = 20
+#: Residual degrees of freedom a horizon's regression must keep after its parameters.
+#:
+#: This replaced a fixed floor of twenty rows, which was wrong in a way only measurement showed.
+#: The parameter count grows with the lag order -- a constant, the shock, and ``lags`` times three
+#: variables -- so at eight lags a projection estimates twenty-six coefficients, and a fixed floor
+#: of twenty let it run on twenty-two observations. It did not fail: it returned -0.3986 for the
+#: output response with a rank-deficient design, which is a number where there is no estimate.
+#: Jules' implementation of this same package scaled its guard with the parameters and refused.
+MIN_RESIDUAL_DF = 10
 
 
 @register
@@ -80,11 +87,21 @@ class LocalProjections:
         system = self._system(panel)
         if self.shock not in system.columns:
             raise ValueError(f"unknown shock {self.shock!r}; the system carries {list(system)}")
+        unknown = [r for r in self.responses if r not in system.columns]
+        if unknown:
+            raise ValueError(
+                f"unknown response(s) {unknown}; the system carries {list(system)}. "
+                "Left unchecked this surfaced as a bare KeyError from inside the loop."
+            )
 
         controls = pd.concat(
             [system.shift(lag).add_suffix(f"_l{lag}") for lag in range(1, self.lags + 1)], axis=1
         )
         design = pd.concat([system[self.shock].rename("shock"), controls], axis=1)
+
+        # constant, the shock itself, and one coefficient per variable per lag
+        n_params = 2 + self.lags * len(system.columns)
+        needed = n_params + MIN_RESIDUAL_DF
 
         rows: list[dict[str, object]] = []
         regressions = 0
@@ -93,25 +110,44 @@ class LocalProjections:
                 # cumulative from the period of the shock, so horizon zero is zero by construction
                 left = (system[response].shift(-h) - system[response]).rename("y")
                 frame = pd.concat([left, design], axis=1).dropna()
-                if len(frame) < MIN_OBS:
+                if h == 0:
+                    # y is identically zero here, so there is nothing to estimate. Running the
+                    # regression anyway returned the right number for the wrong reason and
+                    # inflated the regression count by one per response.
+                    rows.append(
+                        {
+                            "horizon": 0,
+                            "response": response,
+                            "value": 0.0,
+                            "std_error": 0.0,
+                            "ci_low": 0.0,
+                            "ci_high": 0.0,
+                            "n_obs": len(frame),
+                        }
+                    )
+                    continue
+                if len(frame) < needed:
                     raise ValueError(
-                        f"not enough observations for horizon {h}: {len(frame)} usable, and a "
-                        f"projection needs at least {MIN_OBS}. Shorten the horizon or the lags."
+                        f"not enough observations for horizon {h}: {len(frame)} usable against "
+                        f"{n_params} parameters, and this projection keeps at least "
+                        f"{MIN_RESIDUAL_DF} residual degrees of freedom. Shorten the lags or the "
+                        "horizon, or lengthen the sample."
                     )
                 fitted = sm.OLS(frame["y"], sm.add_constant(frame.drop(columns="y"))).fit(
-                    cov_type="HAC", cov_kwds={"maxlags": max(h, 1)}
+                    cov_type="HAC", cov_kwds={"maxlags": h}
                 )
                 regressions += 1
                 beta = float(fitted.params["shock"])
                 error = float(fitted.bse["shock"])
+                low, high = fitted.conf_int(alpha=0.05).loc["shock"]
                 rows.append(
                     {
                         "horizon": h,
                         "response": response,
                         "value": beta,
                         "std_error": error,
-                        "ci_low": beta - 1.96 * error,
-                        "ci_high": beta + 1.96 * error,
+                        "ci_low": float(low),
+                        "ci_high": float(high),
                         "n_obs": int(fitted.nobs),
                     }
                 )
@@ -124,6 +160,7 @@ class LocalProjections:
                 {"metric": "shock", "value": self.shock},
                 {"metric": "cov", "value": "newey_west"},
                 {"metric": "regressions", "value": str(regressions)},
+                {"metric": "n_params", "value": str(n_params)},
                 {"metric": "n_obs_max", "value": str(int(irf["n_obs"].max()))},
                 {"metric": "n_obs_min", "value": str(int(irf["n_obs"].min()))},
                 {"metric": "entity", "value": self.entity},

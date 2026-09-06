@@ -92,9 +92,14 @@ class SignRestrictedVAR:
 
     def fit(self, panel: pd.DataFrame, ctx: RunContext) -> Result:
         system = self._system(panel)
-        if len(system) <= self.lags * len(VARIABLES) + 1:
+        # what each equation estimates: a constant plus one coefficient per variable per lag
+        n_params = self.lags * len(VARIABLES) + 1
+        effective = len(system) - self.lags
+        if effective < n_params:
             raise ValueError(
-                f"not enough observations for a VAR of {self.lags} lags: {len(system)} usable"
+                f"not enough observations for a VAR of {self.lags} lags: {len(system)} rows leave "
+                f"an effective sample of {effective} against {n_params} parameters per equation. "
+                "Reduce the lags or lengthen the sample."
             )
 
         fitted = VAR(system).fit(self.lags)
@@ -153,6 +158,7 @@ class SignRestrictedVAR:
                 {"metric": "bands", "value": f"{low}-{high}"},
                 {"metric": "lags", "value": str(self.lags)},
                 {"metric": "n_obs", "value": str(int(fitted.nobs))},
+                {"metric": "n_params", "value": str(n_params)},
                 {"metric": "seed", "value": str(ctx.seed)},
                 {"metric": "asof", "value": str(ctx.asof)},
             ]
