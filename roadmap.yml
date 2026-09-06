@@ -31,7 +31,7 @@ fases:
   - {id: F3, nome: "Análises tier 1", estado: fechada}
   - {id: F4, nome: "Nowcasting e índices", estado: aberta}
   - {id: F5, nome: "DSGE", estado: a_fazer}
-  - {id: F6, nome: "Interface funcional", estado: a_fazer}
+  - {id: F6, nome: "Interface funcional sobre a base e os modelos", estado: a_fazer}
   - {id: F7, nome: "Preços de ativos (projeto irmão, mesmo repositório)", estado: a_fazer}
 
 modulos:
