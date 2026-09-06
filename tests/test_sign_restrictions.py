@@ -25,8 +25,9 @@ import pytest
 
 pytest.importorskip("econmodels.sign_restrictions", reason="WP-04f not implemented yet")
 
-from econmodels.base import PanelError, RunContext
 from econmodels.sign_restrictions import SignRestrictedVAR
+
+from econmodels.base import PanelError, RunContext
 from econmodels.var import VectorAutoregression
 
 FIX = Path(__file__).parent / "fixtures" / "analysis" / "us_quarterly_var.csv"
@@ -179,10 +180,9 @@ def test_restrictions_nothing_can_satisfy_are_refused_rather_than_returned_empty
         SignRestrictedVAR(
             entity="US",
             lags=4,
-            horizon=20,
-            restrict_through=20,
+            horizon=8,
             draws=200,
-            signs={"policy": 1, "output": -1, "inflation": -1},
+            signs={"policy": 1, "output": 1, "inflation": 1},
         ).fit(us_panel(), ctx())
 
 
