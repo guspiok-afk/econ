@@ -289,13 +289,21 @@ modulos:
   - id: M044
     fase: F4
     nome: "Decomposição livres × administrados do IPCA"
-    estado: a_fazer
-    depende_de: [M011]
+    estado: validado
+    depende_de: [M011, M030]
     criterio_aceite: >
-      Derivada gravada pelo caminho bitemporal com method_version; nome honesto — é decomposição
-      do BCB, não sticky-price CPI no sentido do Fed de Atlanta.
-    preso_por: ["tests/test_br_decomposition.py"]
-    nota: "Séries já catalogadas: bcb_sgs 11428 (livres) e 4449 (administrados), desde jan/1991."
+      Contribuição de cada parte para a inflação de doze meses, com pesos recuperados em janela
+      móvel e somando exatamente 1; a linha de composição fecha a diferença entre somar
+      contribuições mensais e compor doze meses, de modo que as participações somem 1; nome
+      honesto — é a decomposição do BCB, não sticky-price CPI no sentido do Fed de Atlanta.
+    preso_por: ["tests/test_decomposition.py", "tests/test_br_decomposition.py"]
+    nota: >
+      Séries catalogadas em bcb_sgs 11428 (livres) e 4449 (administrados), desde jan/1991. O peso
+      é móvel por medição e não por gosto: numa amostra cheia os administrados pesam 16,1%, mas
+      17,9% de 1995 a 2005, 25,1% de 2006 a 2015 e 25,8% depois — o peso cheio é puxado para
+      baixo pela hiperinflação até 1994 e não serve a nenhum subperíodo. `test_br_decomposition`
+      valida o catálogo, `test_decomposition` valida o modelo; o `preso_por` antes citava só o
+      primeiro, e escapou porque a regra do arquivo só morde marco já validado.
 
   - id: M045
     fase: F4
@@ -471,6 +479,9 @@ validacao:
 
   - regra: "Uma fonte que reescreva o próprio histórico faz o pipeline recusar, não corromper"
     fonte: "tests/test_pipeline.py::test_a_vintage_that_vanishes_from_the_source_is_refused_not_absorbed"
+
+  - regra: "As participações de uma decomposição somam exatamente 1, com a composição nomeada"
+    fonte: "tests/test_decomposition.py::test_as_participacoes_somam_um_em_todo_periodo"
 
 backlog:
   - id: B01
