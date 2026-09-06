@@ -143,3 +143,32 @@ def test_the_stylesheet_is_a_file_and_is_inlined(page) -> None:
     assert (ROOT / "tools" / "painel.css").exists()
     assert "<style>" in page and "--accent" in page
     assert re.search(r"link rel=\"stylesheet\" href=\"https://fonts\.googleapis", page)
+
+
+# ------------------------------------------------------------------ the hosted copy
+@pytest.fixture(scope="module")
+def artifact_page(render_roadmap) -> str:
+    roadmap, manifest = render_roadmap.load()
+    repo = render_roadmap.Repo(branch="test", head="0000000", dirty=False, tests=1)
+    return render_roadmap.render(
+        roadmap, manifest, repo, dt.datetime(2026, 9, 6, 12, 0), artifact=True
+    )
+
+
+def test_the_artifact_copy_brings_no_document_skeleton(artifact_page) -> None:
+    """The host supplies doctype, html, head and body. Sending ours would nest two documents."""
+    for tag in ("<!doctype", "<html", "<head>", "<body"):
+        assert tag not in artifact_page.lower(), f"the artifact copy still carries {tag!r}"
+
+
+def test_the_artifact_copy_keeps_its_title_and_styles(artifact_page) -> None:
+    """The host keeps the head it is given, and the title is how the page is named in a gallery."""
+    assert artifact_page.startswith("<title>")
+    assert "<style>" in artifact_page and "--accent" in artifact_page
+
+
+def test_both_copies_carry_the_same_content(page, artifact_page, render_roadmap) -> None:
+    """One generator, two wrappers. A milestone that reaches one must reach the other."""
+    roadmap, _ = render_roadmap.load()
+    for milestone in roadmap["modulos"]:
+        assert (milestone["id"] in page) == (milestone["id"] in artifact_page)

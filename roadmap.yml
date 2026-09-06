@@ -332,6 +332,8 @@ modulos:
       tools/render_roadmap.py lê roadmap.yml e .pma/project.yaml e escreve painel/econ.html
       autocontido, sem edição manual; todo marco, lacuna aberta e decisão chega à página;
       lacunas ordenadas por gravidade; conteúdo escapado; nada de placeholder por substituir.
+      `--artifact` emite a mesma página sem esqueleto de documento, para o hospedeiro que fornece
+      o seu — publicada em claude.ai/code/artifact/93f5a13e-3e87-4f86-a439-e3dddbdd9398.
     preso_por: ["tests/test_render_roadmap.py", "tests/test_roadmap.py"]
     nota: >
       Primeiro pedaço da F6, e o que resolve o problema que motivou este arquivo: o painel foi
@@ -484,8 +486,8 @@ backlog:
     estado: feito
     nota: >
       Entregue em 06/09/2026 como M050. `uv run python tools/render_roadmap.py` escreve
-      painel/econ.html. O Artifact escrito à mão fica como está até alguém decidir republicá-lo
-      a partir daqui.
+      painel/econ.html, e `--artifact` gera a cópia publicada, que passou a sair daqui em vez de
+      ser escrita à mão. O mesmo endereço de antes, para abrir do celular.
 
   - id: B03
     titulo: "Devolver a validacao do fator dinamico quando o PR 42 entrar"

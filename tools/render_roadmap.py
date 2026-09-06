@@ -10,7 +10,7 @@ What it will not do is invent. Everything here is read from `roadmap.yml`, `.pma
 and the repository itself; nothing is estimated and passed off as counted. Where a figure is a
 guess it is labelled a guess, and where it comes from a command that ran, the page says so.
 
-Usage:  uv run python tools/render_roadmap.py [--out painel/econ.html] [--open]
+Usage:  uv run python tools/render_roadmap.py [--out painel/econ.html] [--artifact]
 """
 
 from __future__ import annotations
@@ -228,7 +228,9 @@ def render_backlog(roadmap: dict) -> str:
 
 
 # ------------------------------------------------------------------ the page
-def render(roadmap: dict, manifest: dict, repo: Repo, now: dt.datetime) -> str:
+def render(
+    roadmap: dict, manifest: dict, repo: Repo, now: dt.datetime, *, artifact: bool = False
+) -> str:
     project = roadmap["projeto"]
     dirty = " · árvore suja" if repo.dirty else ""
     head = (
@@ -276,7 +278,8 @@ def render(roadmap: dict, manifest: dict, repo: Repo, now: dt.datetime) -> str:
         "marco é declarado no roadmap e sustentado pelos testes que ele nomeia.</footer>",
     ]
     css = (Path(__file__).resolve().parent / "painel.css").read_text(encoding="utf-8")
-    return TEMPLATE.format(body="".join(parts), title=e(project["nome"]), css=css)
+    template = ARTIFACT_TEMPLATE if artifact else TEMPLATE
+    return template.format(body="".join(parts), title=e(project["nome"]), css=css)
 
 
 #: The page shell. Styles live in `painel.css` next to this file: CSS in a Python string has to
@@ -289,14 +292,28 @@ TEMPLATE = """<!doctype html>
 <style>{css}</style></head><body><div class="wrap">{body}</div></body></html>
 """
 
+#: The same page for the Artifact host, which supplies its own document skeleton: it wraps the
+#: file in doctype/html/head/body at publish time, so shipping our own would nest one document
+#: inside another. Title and styles stay, because the host keeps the head it is given.
+ARTIFACT_TEMPLATE = """<title>{title}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>{css}</style>
+<div class="wrap">{body}</div>
+"""
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", default=str(ROOT / "painel" / "econ.html"))
+    parser.add_argument(
+        "--artifact",
+        action="store_true",
+        help="emit the fragment the Artifact host wants: no doctype, html, head or body",
+    )
     args = parser.parse_args()
 
     roadmap, manifest = load()
-    page = render(roadmap, manifest, Repo.read(), dt.datetime.now())
+    page = render(roadmap, manifest, Repo.read(), dt.datetime.now(), artifact=args.artifact)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page, encoding="utf-8")
