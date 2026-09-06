@@ -308,6 +308,10 @@ modulos:
       baixo pela hiperinflação até 1994 e não serve a nenhum subperíodo. `test_br_decomposition`
       valida o catálogo, `test_decomposition` valida o modelo; o `preso_por` antes citava só o
       primeiro, e escapou porque a regra do arquivo só morde marco já validado.
+      A mesma álgebra desce um nível sem mudar nada: os livres são a soma ponderada de serviços e
+      comercializáveis. Medido em 06/09/2026 — serviços pesam 44,6% dos livres e correm a 5,84%
+      em doze meses, contra 2,12% dos comercializáveis. É o padrão brasileiro, e serviços é o que
+      o Banco olha para pressão subjacente.
 
   - id: M045
     fase: F4
@@ -414,10 +418,11 @@ lacunas:
     gravidade: baixa
     titulo: "`pseudo` sobre série que TEM vintages reais descarta o histórico em silêncio"
     onde: "src/econbase/api.py (_observations)"
-    estado: aberta
+    estado: fechada
     nota: >
-      Pedir pseudo para uma série do FRED usa o valor corrente em vez das vintages gravadas.
-      É o que foi pedido, mas merece aviso nas diagnósticas.
+      Pedir pseudo para uma série do FRED usava o valor corrente em vez das vintages gravadas,
+      sem dizer nada — que é a diferença entre medir previsão e medir memória. Agora levanta
+      `VintageMixWarning` nomeando a série, e fica calado onde não há história para descartar.
 
   - id: L05
     gravidade: media
@@ -529,6 +534,9 @@ validacao:
 
   - regra: "O roadmap não descreve como pendente um trabalho cujos testes já existem"
     fonte: "tests/test_roadmap.py::test_a_milestone_still_to_do_does_not_already_have_its_tests"
+
+  - regra: "Simular vintages de uma série que as tem gravadas avisa antes de descartá-las"
+    fonte: "tests/test_api.py::test_pseudo_over_a_series_that_has_real_vintages_warns"
 
 backlog:
   - id: B01

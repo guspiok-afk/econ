@@ -95,11 +95,20 @@ class PriceDecomposition:
 
     model_id = "br_price_decomposition"
     model_version = "1"
-    requires: Sequence[ConceptRequest] = (
-        ConceptRequest("cpi_headline", freq="M"),
-        ConceptRequest("cpi_free", freq="M"),
-        ConceptRequest("cpi_administered", freq="M"),
-    )
+
+    @property
+    def requires(self) -> Sequence[ConceptRequest]:
+        """O que ESTA instância pede, e não o que a classe pede em geral.
+
+        A mesma álgebra reparte o IPCA em livres e administrados e reparte os livres em serviços
+        e comercializáveis. Um `requires` fixo na classe declararia os conceitos do primeiro nível
+        mesmo quando a instância trabalha no segundo — decorativo no melhor caso, e mentira no
+        momento em que algo passar a ler a declaração para montar o painel.
+        """
+        return (
+            ConceptRequest(self.headline, freq="M"),
+            *(ConceptRequest(part, freq="M") for part in self.parts),
+        )
 
     def __init__(
         self,

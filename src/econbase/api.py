@@ -149,6 +149,17 @@ class Api:
                     "'mixed' to take real vintages where they exist and simulate elsewhere."
                 )
         else:
+            # `pseudo` sobre série que TEM vintages gravadas descarta a história e devolve o valor
+            # de hoje retrodatado. É o que foi pedido — e é a diferença entre um backtest e um
+            # backtest que já sabe a resposta, então não passa em silêncio.
+            if kind == "pseudo" and have.has_true_vintages:
+                warnings.warn(
+                    f"{key.series_id} tem vintages gravadas e foi pedida como 'pseudo': a "
+                    "história real está sendo ignorada em favor do valor atual, retrodatado. "
+                    "Use 'true' para a história como ela foi publicada.",
+                    VintageMixWarning,
+                    stacklevel=3,
+                )
             frame = pseudo_asof(every, key.spec, asof)
 
         self._last_kind[key.series_id] = kind

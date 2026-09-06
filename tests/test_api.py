@@ -289,6 +289,24 @@ def test_latest_never_counts_as_a_mixture(loaded: Api, recwarn) -> None:
     assert not [w for w in recwarn if issubclass(w.category, VintageMixWarning)]
 
 
+def test_pseudo_over_a_series_that_has_real_vintages_warns(loaded: Api) -> None:
+    """Pedir a simulação de uma história que existe é jogá-la fora.
+
+    `pseudo` usa o valor corrente e o retrodata. Numa série com vintages gravadas isso não é uma
+    aproximação: é entregar ao backtest o número já revisado, que é a diferença entre medir
+    previsão e medir memória. É legítimo pedir — a série do FRED tem lag declarado e a simulação
+    responde — mas não em silêncio.
+    """
+    with pytest.warns(VintageMixWarning, match="vintages gravadas"):
+        loaded.get("gdp_real", entity="US", asof="2024-06-30", vintage_kind="pseudo")
+
+
+def test_pseudo_over_a_series_without_vintages_is_quiet(loaded: Api, recwarn) -> None:
+    """Onde não há história para descartar, a simulação é a única resposta possível."""
+    loaded.get("govt_yield_10y", entity="US", asof="2024-06-30", vintage_kind="pseudo")
+    assert not [w for w in recwarn if issubclass(w.category, VintageMixWarning)]
+
+
 # ---------------------------------------------------------------------------- metadata
 def test_describe_carries_what_a_modeller_needs_to_know(loaded: Api) -> None:
     info = loaded.describe("gdp_real", "US")

@@ -182,3 +182,50 @@ def test_a_restricao_de_soma_um_so_vale_para_duas_partes() -> None:
 def test_o_modelo_pede_conceitos_e_nao_series(fitted) -> None:
     precisa = {r.concept for r in PriceDecomposition().requires}
     assert precisa == {"cpi_headline", "cpi_free", "cpi_administered"}
+
+
+# ------------------------------------------------------------------ o segundo nível
+SEGUNDO = ("cpi_services", "cpi_tradables")
+
+
+def painel_livres() -> pd.DataFrame:
+    raw = pd.read_csv(FIX, parse_dates=["period"]).set_index("period")
+    mapa = {"livres": "cpi_free", "servicos": "cpi_services", "comercializaveis": "cpi_tradables"}
+    faltando = set(mapa) - set(raw.columns)
+    assert not faltando, f"a fixture não traz {sorted(faltando)}"
+    return raw[list(mapa)].rename(columns=mapa).add_suffix("@BR")
+
+
+@pytest.fixture(scope="module")
+def nivel_dois():
+    return PriceDecomposition(headline="cpi_free", parts=SEGUNDO).fit(painel_livres(), ctx())
+
+
+def test_a_mesma_algebra_reparte_os_livres_em_servicos_e_comercializaveis(nivel_dois) -> None:
+    """Os livres são eles próprios a soma ponderada de duas partes, e nada no modelo precisou
+    mudar para descer um nível: é a mesma restrição de soma um sobre outro par."""
+    ultimo = nivel_dois.tables()["contribution"]
+    ultimo = ultimo[ultimo["period"] == ultimo["period"].max()].set_index("component")
+    for parte in SEGUNDO:
+        assert parte in ultimo.index
+    assert abs(float(ultimo["share"].sum()) - 1.0) < 1e-9
+
+
+def test_os_pesos_do_segundo_nivel_tambem_somam_um(nivel_dois) -> None:
+    caminho = nivel_dois.tables()["weights"]
+    soma = caminho.groupby("period")["weight"].sum()
+    assert np.allclose(soma.to_numpy(dtype="float64"), 1.0, atol=1e-9)
+
+
+def test_requires_descreve_a_instancia_e_nao_a_classe() -> None:
+    """Um `requires` fixo declararia os conceitos do primeiro nível mesmo trabalhando no segundo.
+
+    Decorativo hoje, porque `fit` resolve as colunas por conta própria — e mentira no dia em que
+    algo passar a ler a declaração para montar o painel, que é exatamente o que `panel_for` faz
+    nos outros modelos.
+    """
+    primeiro = {r.concept for r in PriceDecomposition().requires}
+    segundo = {r.concept for r in PriceDecomposition(headline="cpi_free", parts=SEGUNDO).requires}
+    assert primeiro == {"cpi_headline", "cpi_free", "cpi_administered"}
+    assert segundo == {"cpi_free", *SEGUNDO}
+    assert all(r.freq == "M" for r in PriceDecomposition().requires)
