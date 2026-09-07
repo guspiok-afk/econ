@@ -143,3 +143,111 @@ def test_a_vista_nao_importa_modelo_nenhum() -> None:
     assert "import econmodels" not in fonte
     assert "from econmodels" not in fonte
     assert "statsmodels" not in fonte
+
+
+# ------------------------------------------------------------------ a tela de vintages
+VINTAGES = str(ROOT / "app" / "pages" / "1_vintages.py")
+
+
+@pytest.fixture(scope="module")
+def vintages() -> AppTest:
+    api = pytest.importorskip("econbase.api")
+    try:
+        api.connect().series()
+    except Exception as erro:  # pragma: no cover
+        pytest.skip(f"sem store local: {erro}")
+    return AppTest.from_file(VINTAGES, default_timeout=180).run()
+
+
+def test_a_tela_de_vintages_abre(vintages: AppTest) -> None:
+    assert not vintages.exception, [str(e.value) for e in vintages.exception]
+    assert not vintages.error, [e.value for e in vintages.error]
+
+
+def test_ela_diz_de_que_tipo_e_a_vintage_que_desenhou(vintages: AppTest) -> None:
+    """Sem isso a tela desenharia história gravada e simulação com o mesmo traço.
+
+    `true` é o que a fonte publicou na ocasião; `pseudo` é o valor de hoje recuado pela
+    defasagem, que responde quando algo passou a ser conhecido e não o que foi dito. Mostrar as
+    duas iguais é mentir por omissão, e é a razão de o aviso ser um bloco e não uma legenda.
+    """
+    dito = " ".join([s.value for s in vintages.success] + [i.value for i in vintages.info])
+    assert "gravada" in dito or "simulada" in dito
+
+    tabela = vintages.dataframe[0].value.set_index("campo")["valor"]
+    assert tabela["tipo de vintage"] in {"true", "pseudo", "mixed", "latest"}
+
+
+def test_a_tabela_de_numeros_e_toda_texto(vintages: AppTest) -> None:
+    """Uma coluna que mistura número e travessão vira `object`, e o pyarrow recusa convertê-la:
+    a tabela some da tela e o erro fica só no terminal. Aconteceu ao escrever esta página."""
+    coluna = vintages.dataframe[0].value["valor"]
+    assert all(isinstance(v, str) for v in coluna), coluna.tolist()
+
+
+def test_ela_compara_duas_leituras_da_mesma_serie(vintages: AppTest) -> None:
+    tabela = vintages.dataframe[0].value.set_index("campo")["valor"]
+    assert {"observações então", "observações hoje", "períodos em comum"} <= set(tabela.index)
+    assert int(tabela["observações hoje"].replace(".", "")) >= int(
+        tabela["observações então"].replace(".", "")
+    ), "a leitura de hoje não pode ter menos períodos que a de uma data passada"
+
+
+def test_a_tela_de_vintages_tambem_nao_calcula() -> None:
+    fonte = (ROOT / "app" / "pages" / "1_vintages.py").read_text(encoding="utf-8")
+    assert "from econmodels" not in fonte and "import econmodels" not in fonte
+
+
+# ------------------------------------------------------------------ a tela de modelos
+MODELOS = str(ROOT / "app" / "pages" / "2_modelos.py")
+
+
+@pytest.fixture(scope="module")
+def modelos() -> AppTest:
+    pytest.importorskip("statsmodels", reason="a camada de modelos é um extra")
+    api = pytest.importorskip("econbase.api")
+    try:
+        api.connect().series()
+    except Exception as erro:  # pragma: no cover
+        pytest.skip(f"sem store local: {erro}")
+    return AppTest.from_file(MODELOS, default_timeout=300).run()
+
+
+def test_a_tela_de_modelos_abre_e_estima(modelos: AppTest) -> None:
+    assert not modelos.exception, [str(e.value) for e in modelos.exception]
+    assert not modelos.error, [e.value for e in modelos.error]
+    assert {"Procedência", "Coeficientes", "Diagnósticas"} <= {s.value for s in modelos.subheader}
+
+
+def test_cada_coluna_carrega_o_seu_spec_hash(modelos: AppTest) -> None:
+    """A comparação só significa algo com a impressão digital de cada especificação ao lado.
+
+    Duas estimativas da "mesma" curva não são comparáveis se uma mudou de forma no caminho, e um
+    número sem endereço não é comparável com nada.
+    """
+    procedencia = modelos.dataframe[0].value
+    assert {"especificação", "spec_hash", "segue", "afasta-se"} <= set(procedencia.columns)
+    assert procedencia["spec_hash"].str.len().gt(0).all()
+    assert procedencia["spec_hash"].nunique() == len(procedencia), "hashes repetidos"
+
+
+def test_os_coeficientes_ficam_lado_a_lado(modelos: AppTest) -> None:
+    coeficientes = modelos.dataframe[1].value
+    assert len(coeficientes.columns) >= 2, "menos de duas especificações para comparar"
+    assert coeficientes.notna().any().all(), "alguma coluna veio inteira vazia"
+
+
+def test_a_tela_avisa_que_ajuste_dentro_da_amostra_nao_ordena(modelos: AppTest) -> None:
+    """O aviso existe porque o controle negativo AJUSTA MELHOR: o hiato por Hodrick-Prescott usa
+    o futuro para filtrar o passado. Sem esse aviso a tela convidaria a escolher pelo R²."""
+    assert modelos.warning
+    dito = " ".join(w.value for w in modelos.warning)
+    assert "Hodrick-Prescott" in dito or "dentro da amostra" in dito
+
+
+def test_a_tela_de_modelos_nao_estima_por_conta_propria() -> None:
+    """Ela importa `econmodels` para registrar os modelos e chama `run_spec`. Não faz conta."""
+    fonte = (ROOT / "app" / "pages" / "2_modelos.py").read_text(encoding="utf-8")
+    assert "run_spec" in fonte
+    for proibido in ("OLS(", "statsmodels", ".fit(", "np."):
+        assert proibido not in fonte, f"a tela contém {proibido!r}: a conta está no lugar errado"

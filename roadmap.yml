@@ -397,20 +397,36 @@ modulos:
   - id: M052
     fase: "08"
     nome: "Vintages lado a lado"
-    estado: a_fazer
+    estado: validado
     depende_de: [M051, M040]
     criterio_aceite: >
       Escolher uma data de conhecimento e ver a série como era e como é; o tipo de vintage de
       cada coluna aparece na tela, e um painel misturado avisa como avisa na API.
+    preso_por: ["tests/test_app.py"]
+    nota: >
+      `app/pages/1_vintages.py`. Torna visível a razão de a base guardar revisões desde o dia um:
+      da utilização de capacidade americana, 603 dos 617 períodos conhecidos em junho de 2018
+      foram revisados desde então, com revisão máxima de 1,40 ponto.
+      `api.vintage_used` foi acrescentada para a tela poder dizer se a linha antiga é história
+      gravada ou simulação — desenhar as duas com o mesmo traço seria mentir por omissão.
 
   - id: M053
     fase: "08"
     nome: "Rodar um modelo por especificação e comparar variações"
-    estado: a_fazer
+    estado: validado
     depende_de: [M051, M034]
     criterio_aceite: >
       Escolher `model_id` e especificação, rodar, ver as tabelas do Result; duas especificações
       lado a lado com o `spec_hash` de cada uma visível. É o pedido original do mantenedor.
+    preso_por: ["tests/test_app.py", "tests/test_run.py"]
+    nota: >
+      `app/pages/2_modelos.py` sobre `econmodels/run.py`, que é onde o caminho especificação →
+      painel → resultado passou a morar. A frequência sai de `model.requires` e não de quem
+      chama: painel na grade errada não falha, desloca por linha o que deveria deslocar por
+      período e devolve número plausível.
+      A tela avisa que ajuste dentro da amostra não ordena especificações, porque o controle
+      negativo ajusta MELHOR — R² 0,40 contra 0,26 — e põe 2,30 na expectativa, onde a
+      verticalidade pediria perto de 1.
 
 lacunas:
   - id: C1
@@ -592,6 +608,12 @@ validacao:
 
   - regra: "Simular vintages de uma série que as tem gravadas avisa antes de descartá-las"
     fonte: "tests/test_api.py::test_pseudo_over_a_series_that_has_real_vintages_warns"
+
+  - regra: "A frequência de um painel vem do modelo que vai estimá-lo, nunca de quem chama"
+    fonte: "tests/test_run.py::test_a_frequencia_vem_da_declaracao_do_modelo"
+
+  - regra: "A vista não calcula: nenhuma tela importa modelo ou faz conta"
+    fonte: "tests/test_app.py::test_a_tela_de_modelos_nao_estima_por_conta_propria"
 
 backlog:
   - id: B01

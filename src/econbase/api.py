@@ -288,7 +288,11 @@ class Api:
                 index=pd.DatetimeIndex(pd.to_datetime(frame["period"])),
                 name=label,
             )
-        panel = pd.concat(columns.values(), axis=1, join="inner" if how == "inner" else "outer")
+        # sort=False de propósito: o pandas 4 muda o padrão e avisa, e a ordenação vem logo
+        # abaixo de qualquer forma. Deixar o aviso seria deixar uma quebra marcada para depois.
+        panel = pd.concat(
+            columns.values(), axis=1, join="inner" if how == "inner" else "outer", sort=False
+        )
         panel = panel.sort_index()
         panel.index = pd.DatetimeIndex(panel.index)
         panel.index.name = "period"
@@ -316,6 +320,16 @@ class Api:
                 stacklevel=2,
             )
         return panel
+
+    def vintage_used(self, key: str, entity: str | None = None) -> str | None:
+        """Qual vintage a última leitura desta série usou, ou ``None`` se ela não foi lida.
+
+        `get_panel` prende a divisão ao próprio painel em `attrs`, mas `get` devolve um frame por
+        série e não teria onde pendurá-la. Uma vista que mostra uma série de cada vez precisa da
+        resposta assim mesmo: dizer "como era em junho de 2018" sem dizer se aquilo foi lido de
+        uma vintage gravada ou simulado a partir da defasagem é dizer metade.
+        """
+        return self._last_kind.get(self.resolve(key, entity).series_id)
 
     # ------------------------------------------------------------------ metadata
     def series(self) -> pa.Table:

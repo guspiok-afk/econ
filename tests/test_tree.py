@@ -54,6 +54,9 @@ LOAD_BEARING = [
     # the project's own memory
     "roadmap.yml",
     "app/painel.py",
+    "app/pages/1_vintages.py",
+    "app/pages/2_modelos.py",
+    "src/econmodels/run.py",
     "docs/adr/0008-the-app-is-a-thin-view-over-the-read-api.md",
     "tools/render_roadmap.py",
     "tools/painel.css",
