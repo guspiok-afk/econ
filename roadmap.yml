@@ -437,6 +437,12 @@ modulos:
       meses) e a curva de Phillips do Banco Central, que marca em cinza o que é indistinguível de
       zero a dois erros-padrão. A folga do produto está entre eles: 0,0058 com erro de 0,0758.
       A regra de Taylor fica de fora pelo mesmo motivo do PIB.
+      Acrescentados a pedido do dono: a curva ao longo do tempo contra a Selic — realizado,
+      previsto e taxa de política numa escala só, erro absoluto médio de 2,52 p.p. em 78
+      trimestres, correlação entre erro e Selic de -0,043 — e a comparação da inclinação entre os
+      dois países. Aí a página encosta na fronteira da licença de propósito: a SÉRIE americana
+      vem do FRED e não pode ser republicada, o COEFICIENTE é estatística nossa. Por isso há
+      tabela dos EUA e não gráfico; o gráfico americano vive no aplicativo.
 
   - id: M053
     fase: "08"
@@ -552,6 +558,22 @@ lacunas:
       corrigi a função e a página continuou errada, porque quem aplicava o replace era o CHAMADOR.
       Só um teste sobre a saída final — não sobre a função — fechou. Testar a unidade não bastou,
       e está registrado como regra em `validacao`.
+
+  - id: L08
+    gravidade: media
+    titulo: "`annualised_quarterly` aplicada a um índice devolvia dezenas de milhares por cento"
+    onde: "src/econmodels/phillips.py"
+    estado: fechada
+    nota: >
+      A transformação compõe uma TAXA percentual por período. Aplicada ao índice de preços
+      americano — 333 em vez de 0,33 — devolvia 35.047%, e a regressão seguinte rodava sem erro:
+      R² de 0,997, inércia em 1,07, resíduo médio de 266 pontos percentuais. Resultado
+      numericamente plausível para pergunta sem sentido, que é a forma de erro que este
+      repositório mais persegue.
+      Descoberto escrevendo a especificação americana, que não existia. Agora `annualised_quarterly`
+      RECUSA acima de 1000% e diz qual transformação usar, e existe `log_diff_ann` para índice —
+      400 vezes a diferença de log, na mesma unidade, para um coeficiente brasileiro e um
+      americano serem comparáveis sem conversão de cabeça.
 
   - id: L04
     gravidade: baixa
@@ -706,6 +728,16 @@ validacao:
 
   - regra: "A página publicada é conferida como página, e não só pelas funções que a montam"
     fonte: "tests/test_boletim.py::test_na_pagina_gerada_as_coordenadas_continuam_pares"
+
+  - regra: "Nenhuma série restrita vaza para a página publicada, nem dentro de um gráfico"
+    fonte: "tests/test_boletim.py::test_a_comparacao_entre_paises_traz_so_coeficientes"
+
+  - regra: "Em nenhum dos dois países a inclinação da Phillips se separa de zero"
+    fonte: "tests/test_boletim.py::test_nenhuma_inclinacao_se_separa_de_zero"
+    nota: >
+      Medida, não suposta: Brasil +0,006 com erro 0,076; Estados Unidos +0,108 com erro 0,178 e
+      ainda com o sinal trocado. O teste falha se isso mudar, obrigando a atualizar o texto da
+      página antes de mexer no número.
 
   - regra: "Toda entrada da tabela de roteamento foi exercida ao menos uma vez, e corrigida pelo que se mediu"
     fonte: "roadmap.yml"

@@ -1,0 +1,50 @@
+# Uma curva de Phillips americana com hiato de desemprego, retrospectiva por falta de alternativa.
+#
+# Não segue banco central nenhum: é nossa, e o campo `follows` diz isso em vez de emprestar
+# autoridade que a especificação não tem. A brasileira ao lado segue a equação do boxe de junho
+# de 2024 do Banco Central; esta não tem equivalente, porque o catálogo americano não traz
+# expectativas de inflação — não há SPF nem Focus aqui — e sem elas a única curva honesta é a
+# aceleracionista: a inflação de hoje explicada pela inércia dela mesma e pela folga do mercado
+# de trabalho.
+#
+# A previsão que a torna útil é o SINAL. Desemprego acima do seu nível filtrado deve reduzir a
+# inflação, então `folga` tem de sair NEGATIVO. Se sair positivo, ou indistinguível de zero, isso
+# é resultado sobre a amostra e não defeito — e é exatamente o que a literatura de identificação
+# vem relatando desde Mavroeidis, Plagborg-Møller e Stock (2014).
+spec_id: us_desemprego
+model_id: phillips
+version: "1"
+entity: US
+
+provenance:
+  follows: >
+    Nenhuma publicação: especificação própria, aceleracionista, do tipo que aparece em livro-texto
+    como ponto de partida. Escrita para ter um contraponto americano à curva brasileira do Banco
+    Central, e não para reproduzir um modelo publicado.
+  source_url: ""
+  departs: >
+    Sem expectativas de inflação, porque o catálogo americano não as traz — e essa ausência é a
+    diferença que mais importa em relação à especificação brasileira, que tem o Focus. Uma curva
+    sem expectativas atribui à inércia o que pode ser expectativa adaptativa, e o coeficiente de
+    inércia aqui deve ser lido com isso em mente.
+    Hiato de desemprego pelo filtro de Hamilton, que não usa o futuro, em vez de uma taxa natural
+    estimada em sistema. Sem termo de preços de importação nem de commodities.
+
+dependent:
+  concept: cpi_headline_index
+  # log_diff_ann e nao annualised_quarterly: a serie e um INDICE de nivel, e a segunda espera
+  # uma taxa por periodo. Aplicada ao indice ela devolvia 35.047% — hoje o modelo recusa, mas so
+  # passou a recusar depois de eu tropecar nisso.
+  transform: log_diff_ann
+
+terms:
+  - {name: inercia, concept: cpi_headline_index, transform: log_diff_ann, lags: [1, 2, 3, 4]}
+  - {name: folga, concept: unemployment_rate, transform: hamilton_gap, lags: [1]}
+
+estimation:
+  method: ols
+  cov: newey_west
+  maxlags: 4
+
+sample:
+  start: "1990-01-01"

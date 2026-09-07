@@ -21,10 +21,30 @@ from econmodels.base import (
 )
 from econmodels.specs import Spec
 
+#: Acima disto o resultado de `annualised_quarterly` não é inflação: é uma série de nível que
+#: entrou onde se esperava uma taxa. Uma inflação trimestral anualizada de mil por cento existiu
+#: no Brasil e está fora de qualquer amostra estimável aqui, então o teto não corta dado real.
+MAX_ANUALIZADA = 1000.0
+
 
 def _annualised_quarterly(s: pd.Series) -> pd.Series:
-    """Compound a quarterly percentage rate into an annual percentage rate."""
-    return ((1.0 + s / 100.0) ** 4 - 1.0) * 100.0
+    """Compound a quarterly percentage rate into an annual percentage rate.
+
+    Recusa se o resultado explodir. Aplicada a um ÍNDICE em vez de a uma taxa — 333 em vez de
+    0,33 — esta conta devolve dezenas de milhares por cento, e a regressão seguinte roda com R² de
+    0,997, coeficiente de inércia em 1,07 e resíduo médio de 266 pontos. Nada disso levanta
+    exceção: sai um resultado numericamente plausível para uma pergunta sem sentido, que é a
+    forma de erro que este repositório mais persegue.
+    """
+    saida = ((1.0 + s / 100.0) ** 4 - 1.0) * 100.0
+    limpo = saida.dropna()
+    if not limpo.empty and float(limpo.abs().max()) > MAX_ANUALIZADA:
+        raise ValueError(
+            f"annualised_quarterly devolveu {float(limpo.abs().max()):,.0f}%, o que não é "
+            "inflação: a entrada é uma taxa percentual por período, e o que chegou parece um "
+            "índice de nível. Use log_diff_ann para um índice."
+        )
+    return saida
 
 
 def _log_diff(s: pd.Series) -> pd.Series:
@@ -63,6 +83,10 @@ def _apply_transform(s: pd.Series, transform_name: str | None) -> pd.Series:
         return _annualised_quarterly(s)
     if transform_name == "log_diff":
         return _log_diff(s)
+    if transform_name == "log_diff_ann":
+        # 400 e não 100: quatro trimestres, para ficar na mesma unidade de annualised_quarterly e
+        # permitir comparar um coeficiente brasileiro com um americano sem conversão de cabeça
+        return 4.0 * _log_diff(s)
     if transform_name == "hamilton_gap":
         return _hamilton_gap(s)
     if transform_name == "hp_gap":

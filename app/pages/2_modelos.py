@@ -149,6 +149,43 @@ if colunas:
         "coeficiente seja zero."
     )
 
+# ------------------------------------------------------------------ o que a curva acertou
+ajustes = {}
+for spec_id, resultado in resultados.items():
+    tabela = resultado.tables().get("fitted")
+    if tabela is None or tabela.empty:
+        continue
+    ajustes[spec_id] = tabela
+
+if ajustes:
+    st.subheader("Realizado contra previsto")
+    st.caption(
+        "Uma curva de Phillips é uma relação, não uma série: o que se desenha ao longo do tempo é "
+        "o que ela acertou. A taxa de política entra no mesmo eixo — é onde a pergunta “contra a "
+        "Selic”, ou contra a fed funds, faz sentido."
+    )
+    for spec_id, tabela in ajustes.items():
+        entidade = disponiveis[spec_id].entity
+        quadro = tabela.set_index("period")[["actual", "fitted"]]
+        quadro.columns = ["realizado", "previsto pela curva"]
+        try:
+            juros = (
+                api()
+                .get("policy_rate", entity=entidade, freq="Q", agg="eop", as_pandas=True)
+                .set_index("period")["value"]
+            )
+            quadro = quadro.join(juros.rename("taxa de política"), how="left")
+        except Exception as erro:  # a série de juros pode não existir para a entidade
+            st.caption(f"sem taxa de política para {entidade}: {erro}")
+        st.markdown(f"**{spec_id}** · {entidade}")
+        st.line_chart(quadro, height=300)
+        erro_medio = float(tabela["residual"].abs().mean())
+        st.caption(
+            f"Erro absoluto médio de {erro_medio:.2f} ponto por trimestre em {len(tabela)} "
+            "trimestres."
+        )
+
+
 # ------------------------------------------------------------------ diagnósticas
 st.subheader("Diagnósticas")
 diagnosticas = {}

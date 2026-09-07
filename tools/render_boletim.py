@@ -220,26 +220,140 @@ def _cartao(api, ind: Indicador) -> str:
 # vestido de prescrição de juros.
 
 
-def _duas_linhas(a: list[float], b: list[float], datas: list[str]) -> str:
-    """Duas séries na mesma escala, para que a comparação seja de nível e não de forma."""
-    juntos = a + b
+def _linhas(series: list[tuple[list[float], str]], datas: list[str]) -> str:
+    """Várias séries numa escala só, porque escalas diferentes comparam forma e mentem sobre nível.
+
+    A primeira entrega a escala e as demais são desenhadas dentro dela. Uma série que estourasse
+    a caixa sairia cortada em silêncio, então a escala é a união de todas antes de qualquer traço.
+    """
+    juntos = [v for valores, _ in series for v in valores]
     if len(juntos) < 4:
         return ""
-    base = _grafico(a, datas)
     menor, maior = min(juntos), max(juntos)
     if menor == maior:
-        return base
+        menor, maior = menor - 0.5, maior + 0.5
+
+    base = _grafico(series[0][0], datas, escala=(menor, maior))
     esquerda, baixo, topo = 38.0, 16.0, 6.0
     largura, altura = 320, 150
     util_y = altura - baixo - topo
-    passo = (largura - esquerda - 4) / (len(b) - 1)
-    pontos = " ".join(
-        f"{esquerda + i * passo:.1f},{topo + (maior - v) / (maior - menor) * util_y:.1f}"
-        for i, v in enumerate(b)
+
+    extras = ""
+    for valores, classe in series[1:]:
+        if len(valores) < 2:
+            continue
+        passo = (largura - esquerda - 4) / (len(valores) - 1)
+        pontos = " ".join(
+            f"{esquerda + i * passo:.1f},{topo + (maior - v) / (maior - menor) * util_y:.1f}"
+            for i, v in enumerate(valores)
+        )
+        extras += f'<polyline class="traco {classe}" points="{pontos}"/>'
+    return base.replace("</svg>", extras + "</svg>")
+
+
+def _duas_linhas(a: list[float], b: list[float], datas: list[str]) -> str:
+    return _linhas([(a, "a"), (b, "b")], datas)
+
+
+def _phillips_no_tempo(api, ctx_data: dt.date) -> str:
+    """A curva ao longo do tempo, com a Selic na mesma escala.
+
+    Uma curva de Phillips não é uma série: é uma relação. O que se pode desenhar historicamente é
+    o que ela ACERTOU — a inflação que ela previa contra a que aconteceu — e é isso que está aqui,
+    com a taxa de política no mesmo eixo, que é onde a pergunta "contra a Selic" faz sentido.
+
+    As três grandezas são percentuais e cabem numa escala só: inflação anualizada trimestral entre
+    -1,1 e 14,7 e Selic entre 2,0 e 15,0 no período estimado. Fossem incomparáveis, dois eixos
+    seriam a resposta — e dois eixos num gráfico pequeno são um convite a ver correlação onde há
+    escolha de escala.
+    """
+    import pandas as pd
+
+    import econmodels.phillips  # noqa: F401  registra o modelo
+    from econmodels.run import run_spec
+    from econmodels.specs import load_specs
+
+    spec = load_specs(Path(ROOT) / "specs", model_id="phillips")["br_bcb_small_scale"]
+    ajuste = run_spec(api, spec, asof=ctx_data).tables()["fitted"]
+    ajuste["period"] = pd.to_datetime(ajuste["period"])
+
+    selic = api.get("policy_rate", entity="BR", freq="Q", agg="eop").set_index("period")["value"]
+    selic.index = pd.to_datetime(selic.index)
+    junto = ajuste.set_index("period").join(selic.rename("selic"), how="left").dropna()
+
+    datas = [str(d.date()) for d in junto.index]
+    realizado = [float(v) for v in junto["actual"]]
+    previsto = [float(v) for v in junto["fitted"]]
+    juros = [float(v) for v in junto["selic"]]
+    erro_medio = float(junto["residual"].abs().mean())
+    correlacao = float(junto["residual"].corr(junto["selic"]))
+
+    return (
+        '<article class="modelo">'
+        "<h3>A curva contra a Selic</h3>"
+        '<p class="sub">Inflação de preços livres, anualizada no trimestre: o que aconteceu, o '
+        "que a equação do Banco Central previa, e a Selic no mesmo eixo. Todas em por cento.</p>"
+        f"{_linhas([(realizado, 'a'), (previsto, 'b'), (juros, 'c')], datas)}"
+        f'<div class="legenda"><span class="a">realizado</span>'
+        f'<span class="b">previsto pela curva</span><span class="c">Selic</span></div>'
+        f'<p class="sub">Erro absoluto médio de {erro_medio:.2f} ponto por trimestre em '
+        f"{len(junto)} trimestres. A correlação entre o erro da curva e a Selic é "
+        f"{correlacao:+.3f} — perto de zero, ou seja, o que a equação erra não é explicado pelo "
+        "aperto ou pela folga monetária do momento.</p>"
+        "</article>"
     )
-    # a primeira linha foi desenhada na escala dela; redesenha as duas na escala comum
-    base = _grafico(a, datas, escala=(menor, maior))
-    return base.replace("</svg>", f'<polyline class="traco b" points="{pontos}"/></svg>')
+
+
+def _duas_curvas(api, ctx_data: dt.date) -> str:
+    """A inclinação brasileira ao lado da americana.
+
+    Aqui a página encosta na fronteira da licença de propósito, e vale dizer onde ela está. A
+    SÉRIE americana vem do FRED e não pode ser republicada — por isso não há gráfico dos Estados
+    Unidos nesta página, e ele mora no aplicativo, que lê o store na máquina e não publica nada.
+    O COEFICIENTE é outra coisa: é uma estatística que estimamos, não o dado da fonte, e é
+    trabalho derivado nosso. É o mesmo raciocínio da ADR-0008 sobre o que um produto poderia
+    vender.
+
+    A especificação americana é nossa e o cartão diz isso. A brasileira segue o Banco Central.
+    """
+    import econmodels.phillips  # noqa: F401  registra o modelo
+    from econmodels.run import run_spec
+    from econmodels.specs import load_specs
+
+    specs = load_specs(Path(ROOT) / "specs", model_id="phillips")
+    linhas = []
+    for spec_id, rotulo in (("br_bcb_small_scale", "Brasil"), ("us_desemprego", "Estados Unidos")):
+        if spec_id not in specs:
+            continue
+        coeficientes = run_spec(api, specs[spec_id], asof=ctx_data).tables()["coefficients"]
+        folga = coeficientes[coeficientes["name"] == "folga"]
+        if folga.empty:
+            continue
+        estimativa, erro = float(folga["estimate"].iloc[0]), float(folga["std_error"].iloc[0])
+        mudo = abs(estimativa) < 2 * erro
+        linhas.append(
+            f"<tr{' class="mudo"' if mudo else ''}><td>{rotulo}</td>"
+            f"<td>{estimativa:+.3f}</td><td>±{erro:.3f}</td>"
+            f"<td>{'—' if mudo else '•'}</td></tr>"
+        )
+    if not linhas:
+        return ""
+    return (
+        '<article class="modelo">'
+        "<h3>A inclinação, nos dois países</h3>"
+        '<p class="sub">O coeficiente da folga: quanto a ociosidade da economia puxa a inflação. '
+        "A teoria pede sinal negativo.</p>"
+        '<table class="coef"><thead><tr><th>país</th><th>folga</th><th>erro</th><th>≠0</th></tr>'
+        f"</thead><tbody>{''.join(linhas)}</tbody></table>"
+        '<p class="sub">Em nenhum dos dois a inclinação se separa de zero a dois erros-padrão, e '
+        "a americana ainda sai com o sinal trocado. Isso não é falha da estimação: é o que "
+        "Mavroeidis, Plagborg-Møller e Stock mostraram em 2014 — a curva é fracamente "
+        "identificada, e amostras deste tamanho não a distinguem de uma reta horizontal.</p>"
+        '<p class="sub">Só os coeficientes aparecem aqui. A série americana vem do FRED, que '
+        "permite uso e não republicação, então o gráfico dos Estados Unidos vive no aplicativo e "
+        "não nesta página.</p>"
+        "</article>"
+    )
 
 
 def _decomposicao(api, ctx_data: dt.date) -> str:
@@ -310,7 +424,7 @@ def _phillips(api, ctx_data: dt.date) -> str:
 
 def _modelos(api, ctx_data: dt.date) -> str:
     partes = []
-    for construir in (_decomposicao, _phillips):
+    for construir in (_decomposicao, _phillips, _phillips_no_tempo, _duas_curvas):
         try:
             partes.append(construir(api, ctx_data))
         except Exception as erro:  # um modelo que não roda não derruba o boletim inteiro

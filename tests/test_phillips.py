@@ -42,7 +42,14 @@ def ctx(asof: str = "2026-09-05") -> RunContext:
 
 @pytest.fixture(scope="module")
 def specs():
-    return load_specs(ROOT / "specs", model_id="phillips")
+    """Só as brasileiras.
+
+    Este arquivo estima sobre um painel brasileiro, e a fixture antes pegava toda especificação
+    de `phillips` — o que era o mesmo conjunto até uma americana existir. Filtrar pela entidade
+    torna explícito o que era coincidência.
+    """
+    todas = load_specs(ROOT / "specs", model_id="phillips")
+    return {sid: spec for sid, spec in todas.items() if spec.entity == "BR"}
 
 
 @pytest.fixture(scope="module")
@@ -189,7 +196,11 @@ def test_the_exploratory_specification_reproduces_the_error_it_documents(specs, 
 
 
 def test_both_specifications_run_on_the_same_panel(specs, panel) -> None:
-    """The use case the whole design exists for: two ways of estimating one model, compared."""
+    """The use case the whole design exists for: two ways of estimating one model, compared.
+
+    Two Brazilian ways. A specification for another country needs that country's panel, which is
+    what the fixture above now says out loud.
+    """
     results = {sid: PhillipsCurve(spec).fit(panel, ctx()) for sid, spec in specs.items()}
     assert len(results) >= 2
     assert len({str(diag(r)["spec_hash"]) for r in results.values()}) == len(results)

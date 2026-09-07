@@ -204,3 +204,56 @@ def test_as_duas_versoes_mostram_os_mesmos_numeros(boletim, api, pagina: str) ->
     fragmento = boletim.render(api, dt.datetime(2026, 9, 6, 23, 0), artifact=True)
     valores = lambda html: re.findall(r'class="valor">([^<]+)<', html)  # noqa: E731
     assert valores(pagina) == valores(fragmento)
+
+
+# ------------------------------------------------------------------ a curva no tempo
+def test_a_curva_aparece_contra_a_taxa_de_politica(pagina: str) -> None:
+    """Uma curva de Phillips é uma relação, não uma série. O que se desenha historicamente é o
+    que ela acertou, e a taxa de política no mesmo eixo é onde a pergunta "contra a Selic" cabe.
+    """
+    assert "A curva contra a Selic" in pagina
+    assert "realizado" in pagina and "previsto pela curva" in pagina and "Selic" in pagina
+    trecho = re.search(r"A curva contra a Selic.*?</article>", pagina, re.S).group(0)
+    assert trecho.count("polyline") == 3, "três linhas: realizado, previsto e a taxa"
+
+
+def test_as_tres_linhas_dividem_uma_escala_so(boletim) -> None:
+    """Dois eixos num gráfico pequeno convidam a ver correlação onde há escolha de escala."""
+    datas = ["2020-01-01", "2021-01-01", "2022-01-01"]
+    svg = boletim._linhas([([1.0, 2.0, 3.0], "a"), ([9.0, 8.0, 7.0], "b")], datas)
+    marcas = re.findall(r'class="marca"[^>]*>([^<]+)<', svg)
+    assert "9.0" in marcas and "1.0" in marcas, marcas
+
+
+def test_a_comparacao_entre_paises_traz_so_coeficientes(pagina: str) -> None:
+    """A fronteira da licença, dita na própria página.
+
+    A série americana vem do FRED e não pode ser republicada, então não há gráfico dos Estados
+    Unidos aqui. O coeficiente é estatística que estimamos, não o dado da fonte.
+    """
+    assert "A inclinação, nos dois países" in pagina
+    assert "Estados Unidos" in pagina
+    assert "não republicação" in pagina or "não republicação" in pagina or "republicação" in pagina
+    for restrita in ("@US", "cpi_headline_index@US", "unemployment_rate@US"):
+        assert restrita not in pagina, f"série restrita vazou para a página: {restrita}"
+
+
+def test_nenhuma_inclinacao_se_separa_de_zero(pagina: str, boletim, api) -> None:
+    """O resultado, e não uma expectativa sobre ele: em nenhum dos dois países a folga se
+    distingue de zero, e a americana ainda sai com o sinal trocado. É o que a literatura de
+    identificação previa, e o teste mede em vez de supor."""
+    import datetime as _dt
+    from pathlib import Path as _P
+
+    import econmodels.phillips  # noqa: F401
+    from econmodels.run import run_spec
+    from econmodels.specs import load_specs
+
+    specs = load_specs(_P(ROOT) / "specs", model_id="phillips")
+    for spec_id in ("br_bcb_small_scale", "us_desemprego"):
+        coef = run_spec(api, specs[spec_id], asof=_dt.date(2026, 9, 6)).tables()["coefficients"]
+        folga = coef[coef["name"] == "folga"].iloc[0]
+        assert abs(float(folga["estimate"])) < 2 * float(folga["std_error"]), (
+            f"{spec_id}: a folga passou a se distinguir de zero — resultado mudou, atualize o "
+            "texto da página antes de mexer neste teste"
+        )

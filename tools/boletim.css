@@ -60,7 +60,9 @@ h2{margin:0; font-size:.74rem; text-transform:uppercase; letter-spacing:.12em; c
 .legenda{display:flex; gap:14px; flex-wrap:wrap; font-size:.74rem; color:var(--fraco)}
 .legenda span::before{content:"—"; margin-right:4px; font-weight:700}
 .legenda .a::before{color:var(--acento)} .legenda .b::before{color:var(--sobe)}
+.legenda .c::before{color:var(--desce)}
 .grafico .traco.b{stroke:var(--sobe)}
+.grafico .traco.c{stroke:var(--desce); stroke-dasharray:4 2}
 footer{border-top:1px solid var(--risco); padding-top:16px; display:flex; flex-direction:column; gap:9px}
 footer p{margin:0; font-size:.78rem; color:var(--fraco)}
 @media (min-width:620px){ .grade{display:grid; grid-template-columns:1fr 1fr} }
