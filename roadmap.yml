@@ -410,6 +410,24 @@ modulos:
       `api.vintage_used` foi acrescentada para a tela poder dizer se a linha antiga é história
       gravada ou simulação — desenhar as duas com o mesmo traço seria mentir por omissão.
 
+  - id: M054
+    fase: "08"
+    nome: "Boletim publicável: o quadro brasileiro sem depender da máquina ligada"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: >
+      Página gerada, autocontida e sem nada a carregar de fora, com um cartão por indicador —
+      valor, unidade, data e faísca; a licença é PORTÃO e não rótulo, e a geração recusa se
+      qualquer série restrita entrar; a cópia para o hospedeiro sai da mesma função que a local.
+    preso_por: ["tests/test_boletim.py"]
+    nota: >
+      `tools/render_boletim.py`. Resolve o caso que o Streamlit não resolve: celular fora da rede
+      e notebook desligado. O preço é ser só leitura e ser um retrato datado.
+      É brasileiro por obrigação, não por escolha: das 73 séries, 40 são redistribuíveis e todas
+      são do BCB e do IBGE. Publicar é republicar, e as 33 do FRED e do NY Fed não permitem.
+      Publicado em claude.ai/code/artifact/74522116-614e-4a93-8d9b-5acc60387b2f.
+      Achou um erro de catálogo ao ser escrito — ver L06.
+
   - id: M053
     fase: "08"
     nome: "Rodar um modelo por especificação e comparar variações"
@@ -495,6 +513,20 @@ lacunas:
       As três escolhas que dependem do mantenedor — amostra curta da PNAD, emenda com a PME, e a
       quebra do CAGED em 2020 — estão em docs/QUESTIONS.md, item T1, para conversa e não como
       bloqueio de execução.
+
+  - id: L06
+    gravidade: media
+    titulo: "A Selic efetiva estava catalogada como taxa anual, e é diária"
+    onde: "catalog/br/bcb_sgs.yaml, série bcb_sgs:11"
+    estado: fechada
+    nota: >
+      Declarava `unit: pct_pa` e é percentual ao dia útil. Confirmado por aritmética: 0,0517% ao
+      dia composto em 252 dias dá 13,9% ao ano, batendo com a meta de 14,00% da mesma data.
+      Nenhum modelo lê esta série, então nada estava errado a jusante — o erro só apareceu quando
+      o boletim a exibiu como "0,05% ao ano", que é absurdo à primeira vista e teria sido
+      publicado. Corrigido para `pct_pd` com o título dizendo qual série do SGS é.
+      A anualizada do SGS é a 1178, que o catálogo ainda não traz.
+      Mesma classe da C1: rótulo de catálogo que ninguém confere porque nada o consome.
 
   - id: L04
     gravidade: baixa

@@ -31,8 +31,12 @@ series:
 
   - native_id: '11'
     concept_id: interbank_rate
-    title: Selic effective rate (overnight)
-    unit: pct_pa
+    # Percentual AO DIA UTIL, nao ao ano: 0,0517% composto em 252 dias uteis da 13,9% a.a., que
+    # bate com a meta de 14,00% da mesma data. Estava catalogada como `pct_pa` e o rotulo errado
+    # sobreviveu porque nenhum modelo le esta serie — so um boletim, onde apareceu como
+    # "0,05% ao ano". A anualizada do SGS e a 1178, que o catalogo ainda nao traz.
+    title: Selic effective rate, per business day (SGS 11)
+    unit: pct_pd
     freq: D
     expected_lag_days: 1
     source_url: https://sistemas.bcb.gov.br/sgs2/consulta/g3/mostrarGrafico.do?method=mostrarGrafico&codigoSerie=11

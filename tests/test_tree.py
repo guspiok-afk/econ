@@ -60,6 +60,8 @@ LOAD_BEARING = [
     "src/econmodels/run.py",
     "docs/adr/0008-the-app-is-a-thin-view-over-the-read-api.md",
     "tools/render_roadmap.py",
+    "tools/render_boletim.py",
+    "tools/boletim.css",
     "tools/painel.css",
     "catalog/us/nyfed.yaml",
     "docs/QUESTIONS.md",

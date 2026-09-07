@@ -1,0 +1,45 @@
+/* Feito para o polegar antes da tela grande: uma coluna, número grande, nada a tocar. */
+:root{
+  --papel:#f5f6f7; --carta:#ffffff; --tinta:#0f1720; --tinta-2:#3a4854; --fraco:#6b7a88;
+  --risco:#dfe4e9; --acento:#1d5b73; --sobe:#9a4b12; --desce:#1f6b4a;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --papel:#0c1116; --carta:#151c23; --tinta:#e8eef4; --tinta-2:#c0cbd6; --fraco:#8494a2;
+    --risco:#26313b; --acento:#69b8d2; --sobe:#e09a5a; --desce:#68c69c;
+  }
+}
+:root[data-theme="dark"]{
+  --papel:#0c1116; --carta:#151c23; --tinta:#e8eef4; --tinta-2:#c0cbd6; --fraco:#8494a2;
+  --risco:#26313b; --acento:#69b8d2; --sobe:#e09a5a; --desce:#68c69c;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--papel); color:var(--tinta);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased;
+}
+.folha{max-width:560px; margin:0 auto; padding:22px 16px 56px; display:flex; flex-direction:column; gap:26px}
+header{display:flex; flex-direction:column; gap:3px; padding-bottom:16px; border-bottom:2px solid var(--tinta)}
+.olho{margin:0; font-size:.72rem; text-transform:uppercase; letter-spacing:.14em; color:var(--fraco); font-weight:600}
+h1{margin:0; font-size:1.6rem; line-height:1.15; letter-spacing:-.015em}
+.carimbo{margin:0; font-size:.8rem; color:var(--fraco); font-variant-numeric:tabular-nums}
+section{display:flex; flex-direction:column; gap:10px}
+h2{margin:0; font-size:.74rem; text-transform:uppercase; letter-spacing:.12em; color:var(--fraco); font-weight:600}
+.grade{display:flex; flex-direction:column; gap:9px}
+.cartao{
+  background:var(--carta); border:1px solid var(--risco); border-radius:10px;
+  padding:13px 15px 8px; display:flex; flex-direction:column; gap:5px; color:var(--acento);
+}
+.topo{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
+.rotulo{color:var(--tinta); font-weight:600; font-size:.95rem}
+.quando{color:var(--fraco); font-size:.7rem; font-variant-numeric:tabular-nums; white-space:nowrap}
+.linha{display:flex; align-items:baseline; gap:7px; flex-wrap:wrap}
+.valor{font-size:1.85rem; font-weight:600; letter-spacing:-.02em; color:var(--tinta); font-variant-numeric:tabular-nums}
+.unidade{font-size:.78rem; color:var(--fraco)}
+.delta{margin-left:auto; font-size:.78rem; font-variant-numeric:tabular-nums; white-space:nowrap}
+.delta.sobe{color:var(--sobe)} .delta.desce{color:var(--desce)} .delta.igual{color:var(--fraco)}
+.faisca{width:100%; height:44px; display:block; opacity:.85}
+footer{border-top:1px solid var(--risco); padding-top:16px; display:flex; flex-direction:column; gap:9px}
+footer p{margin:0; font-size:.78rem; color:var(--fraco)}
+@media (min-width:620px){ .grade{display:grid; grid-template-columns:1fr 1fr} }
