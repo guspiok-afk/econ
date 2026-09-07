@@ -172,14 +172,34 @@ def test_a_document_a_decision_cites_exists(roadmap) -> None:
     assert not missing, f"decisions citing documents that are not there: {missing}"
 
 
-def test_the_manifest_declares_no_phase_the_roadmap_has_forgotten(roadmap) -> None:
-    """Two files describing the same project drifted apart once already, and the panel reported a
-    finished phase as pending while its six models were on main.
+def test_the_two_files_number_the_phases_the_same_way(roadmap) -> None:
+    """One project, one numbering. This file used to have its own.
 
-    The roadmap is allowed to run ahead -- a phase can be planned here before the manifest the
-    PMA reads catches up -- but it may never have fewer phases than the manifest declares.
+    It counted from zero (F0) while `.pma/project.yaml` counts from one (01), so every phase
+    appeared one higher over there — and the offset was not even constant, because the interface
+    sat before the assets project here and after it in the manifest. Asking which phase the
+    interface is had two answers, which is one too many.
+
+    The manifest wins because it is what the PMA reads. The roadmap may run ahead of it — a phase
+    can be planned here before the manifest catches up — but every phase the manifest declares
+    must exist here under the same id, with the same title, in the same order.
     """
     manifest = yaml.safe_load((ROOT / ".pma" / "project.yaml").read_text(encoding="utf-8"))
-    known = {f["nome"] for f in roadmap["fases"]}
-    forgotten = [p["title"] for p in manifest["phases"] if p["title"] not in known]
-    assert not forgotten, f"phases the manifest declares and the roadmap does not: {forgotten}"
+    here = {f["id"]: f["nome"] for f in roadmap["fases"]}
+
+    mismatched = [
+        (p["id"], p["title"], here.get(p["id"]))
+        for p in manifest["phases"]
+        if here.get(p["id"]) != p["title"]
+    ]
+    assert not mismatched, f"phases the two files disagree about: {mismatched}"
+
+    declared = [p["id"] for p in manifest["phases"]]
+    kept = [f["id"] for f in roadmap["fases"] if f["id"] in set(declared)]
+    assert kept == declared, f"the manifest orders phases {declared}, the roadmap {kept}"
+
+
+def test_phase_ids_are_unique_and_sorted(roadmap) -> None:
+    ids = [f["id"] for f in roadmap["fases"]]
+    assert len(ids) == len(set(ids)), "duplicate phase id"
+    assert ids == sorted(ids), f"phases out of order: {ids}"

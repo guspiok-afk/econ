@@ -25,19 +25,23 @@ projeto:
     DuckDB é cache reconstruível por `econbase rebuild-db` e nunca é a verdade.
 
 fases:
-  - {id: F0, nome: "Fundação: contrato, armazenamento, pipeline bitemporal", estado: fechada}
-  - {id: F1, nome: "Conectores e catálogo", estado: fechada}
-  - {id: F2, nome: "Transformações, API e automação", estado: fechada}
-  - {id: F3, nome: "Análises tier 1", estado: fechada}
-  - {id: F4, nome: "Nowcasting e índices", estado: aberta}
-  - {id: F5, nome: "DSGE", estado: a_fazer}
-  - {id: F6, nome: "Interface funcional sobre a base e os modelos", estado: a_fazer}
-  - {id: F7, nome: "Preços de ativos (projeto irmão, mesmo repositório)", estado: a_fazer}
+  # Ids e ordem iguais aos de `.pma/project.yaml`, que é o manifesto que o PMA lê. Este arquivo
+  # numerava de zero (F0) e o manifesto de um (01), então cada fase aparecia uma unidade acima
+  # lá — e o deslocamento nem era constante, porque a interface entrava antes de ativos aqui e
+  # depois dele lá. Duas convenções e duas ordens para o mesmo projeto: agora, uma só.
+  - {id: "01", nome: "Fundação: contrato, armazenamento, pipeline bitemporal", estado: fechada}
+  - {id: "02", nome: "Conectores e catálogo", estado: fechada}
+  - {id: "03", nome: "Transformações, API e automação", estado: fechada}
+  - {id: "04", nome: "Análises tier 1", estado: fechada}
+  - {id: "05", nome: "Nowcasting e índices", estado: aberta}
+  - {id: "06", nome: "DSGE", estado: a_fazer}
+  - {id: "07", nome: "Preços de ativos (projeto irmão, mesmo repositório)", estado: a_fazer}
+  - {id: "08", nome: "Interface funcional sobre a base e os modelos", estado: a_fazer}
 
 modulos:
-  # ---------------------------------------------------------------- F0, fundação
+  # ---------------------------------------------------------------- 01, fundação
   - id: M001
-    fase: F0
+    fase: "01"
     nome: "Contrato de dados e esquemas"
     estado: validado
     depende_de: []
@@ -47,7 +51,7 @@ modulos:
     preso_por: ["tests/test_schemas.py", "tests/test_catalog_ids.py"]
 
   - id: M002
-    fase: F0
+    fase: "01"
     nome: "Store: Parquet como verdade, troca atômica de manifesto"
     estado: validado
     depende_de: [M001]
@@ -57,7 +61,7 @@ modulos:
     preso_por: ["tests/test_store.py"]
 
   - id: M003
-    fase: F0
+    fase: "01"
     nome: "Pipeline bitemporal: intervalos ALFRED, não snapshots"
     estado: validado
     depende_de: [M002]
@@ -72,7 +76,7 @@ modulos:
       RECUSAR, não corromper. Registrado em teste.
 
   - id: M004
-    fase: F0
+    fase: "01"
     nome: "Guarda contra escrita redirecionada"
     estado: validado
     depende_de: [M002]
@@ -85,7 +89,7 @@ modulos:
       inválido — a listagem de diretório é mesclada no MSIX, a escrita não. Nada havia se perdido.
 
   - id: M005
-    fase: F0
+    fase: "01"
     nome: "Guarda de árvore: uma mesclagem não pode apagar trabalho"
     estado: validado
     depende_de: []
@@ -93,9 +97,9 @@ modulos:
     preso_por: ["tests/test_tree.py"]
     nota: "Escrito depois que a mesclagem do PR 23 apagou 4.290 linhas em 43 arquivos."
 
-  # ---------------------------------------------------------------- F1, conectores
+  # ---------------------------------------------------------------- 02, conectores
   - id: M010
-    fase: F1
+    fase: "02"
     nome: "Conectores: FRED, BCB (SGS, PTAX, Focus), SIDRA, IPEA, DBnomics, arquivo HTTP"
     estado: validado
     depende_de: [M003]
@@ -105,7 +109,7 @@ modulos:
     preso_por: ["tests/test_source_fred.py", "tests/test_source_bcb.py", "tests/test_source_sidra_ipea.py", "tests/test_source_dbnomics_files.py"]
 
   - id: M011
-    fase: F1
+    fase: "02"
     nome: "Catálogo inicial"
     estado: validado
     depende_de: [M010]
@@ -116,9 +120,9 @@ modulos:
       mantém a página de conferência local. As que faltam são de menor prioridade e nenhuma trava
       um modelo.
 
-  # ---------------------------------------------------------------- F2, API e automação
+  # ---------------------------------------------------------------- 03, API e automação
   - id: M020
-    fase: F2
+    fase: "03"
     nome: "API por conceito, com corte por data de conhecimento"
     estado: validado
     depende_de: [M011]
@@ -128,7 +132,7 @@ modulos:
     preso_por: ["tests/test_api.py"]
 
   - id: M021
-    fase: F2
+    fase: "03"
     nome: "Rotina diária no agendador local"
     estado: validado
     depende_de: [M020]
@@ -137,7 +141,7 @@ modulos:
     nota: "Medido em 06/09/2026: execução das 12:15 com 73 séries e zero erros."
 
   - id: M022
-    fase: F2
+    fase: "03"
     nome: "Página de conferência das séries"
     estado: validado
     depende_de: [M020]
@@ -147,9 +151,9 @@ modulos:
     preso_por: ["tests/test_report.py"]
     nota: "Local por obrigação: 33 das 73 séries não são redistribuíveis."
 
-  # ---------------------------------------------------------------- F3, análises
+  # ---------------------------------------------------------------- 04, análises
   - id: M030
-    fase: F3
+    fase: "04"
     nome: "Guarda de painel: `requires` passa a significar alguma coisa"
     estado: validado
     depende_de: [M020]
@@ -163,7 +167,7 @@ modulos:
       percentuais de erro e nenhum aviso.
 
   - id: M031
-    fase: F3
+    fase: "04"
     nome: "Paridade descoberta de juros, regressão de Fama"
     estado: validado
     depende_de: [M030]
@@ -172,7 +176,7 @@ modulos:
     nota: "β = −0,628 ao vivo — o sinal negativo clássico, contra a hipótese nula de 1."
 
   - id: M032
-    fase: F3
+    fase: "04"
     nome: "Regra de Taylor com variantes e hiato por filtro"
     estado: validado
     depende_de: [M030]
@@ -183,7 +187,7 @@ modulos:
       SUSPENSO pela lacuna C1: o hiato foi filtrado sobre série sazonal.
 
   - id: M033
-    fase: F3
+    fase: "04"
     nome: "VAR monetário com identificação recursiva"
     estado: validado
     depende_de: [M030]
@@ -191,7 +195,7 @@ modulos:
     preso_por: ["tests/test_var.py"]
 
   - id: M034
-    fase: F3
+    fase: "04"
     nome: "Curva de Phillips do BCB, e uma especificação é um arquivo"
     estado: validado
     depende_de: [M030]
@@ -205,7 +209,7 @@ modulos:
       de servir de portão — erro meu, corrigido medindo.
 
   - id: M035
-    fase: F3
+    fase: "04"
     nome: "Projeções locais de Jordà"
     estado: validado
     depende_de: [M030]
@@ -218,7 +222,7 @@ modulos:
       passava 16/16 nos meus testes de aceitação e era melhor que a minha em quatro pontos.
 
   - id: M036
-    fase: F3
+    fase: "04"
     nome: "VAR identificado por restrições de sinal"
     estado: validado
     depende_de: [M033]
@@ -230,9 +234,9 @@ modulos:
       Transforma +0,3779 do recursivo em −0,1427; aceitação 2,03%, caindo para 0,13% com
       restrição de cinco anos. Guardas vindas do Jules (PR 40), 18/18.
 
-  # ---------------------------------------------------------------- F4, nowcasting
+  # ---------------------------------------------------------------- 05, nowcasting
   - id: M040
-    fase: F4
+    fase: "05"
     nome: "Simulador de vintages: reconstruir o que era conhecido"
     estado: validado
     depende_de: [M020]
@@ -248,7 +252,7 @@ modulos:
       módulo existe para acabar. Achado por revisão delegada ao Antigravity, PR 47.
 
   - id: M041
-    fase: F4
+    fase: "05"
     nome: "Painel irregular: get_panel(mixed_freq=True)"
     estado: validado
     depende_de: [M020]
@@ -259,7 +263,7 @@ modulos:
     preso_por: ["tests/test_api.py"]
 
   - id: M042
-    fase: F4
+    fase: "05"
     nome: "Fator dinâmico de frequência mista, para nowcasting"
     estado: em_revisao
     depende_de: [M040, M041]
@@ -276,7 +280,7 @@ modulos:
       corte por data de referência entregava ao modelo o alvo que ele dizia estimar.
 
   - id: M043
-    fase: F4
+    fase: "05"
     nome: "Backtest pseudo-tempo-real armazenado no store de resultados"
     estado: a_fazer
     depende_de: [M042]
@@ -291,7 +295,7 @@ modulos:
       de um vizinho.
 
   - id: M044
-    fase: F4
+    fase: "05"
     nome: "Decomposição livres × administrados do IPCA"
     estado: validado
     depende_de: [M011, M030]
@@ -314,7 +318,7 @@ modulos:
       o Banco olha para pressão subjacente.
 
   - id: M045
-    fase: F4
+    fase: "05"
     nome: "LMCI-BR por componentes principais"
     estado: bloqueado
     depende_de: [M011]
@@ -326,7 +330,7 @@ modulos:
       variável não é um índice — é a variável com outro nome. Fica bloqueado até a L05.
 
   - id: M046
-    fase: F4
+    fase: "05"
     nome: "GSCPI ingerido"
     estado: validado
     depende_de: [M010]
@@ -344,7 +348,7 @@ modulos:
       observações, porque o índice é padronizado na origem. Máximo em dez/2021, 4,431.
 
   - id: M047
-    fase: F4
+    fase: "05"
     nome: "Nowcast do Brasil"
     estado: bloqueado
     depende_de: [M042]
@@ -354,9 +358,9 @@ modulos:
       Hoje o modelo RECUSA rodar o Brasil, e isso é o comportamento certo: com 55,3% da variação
       explicada pelo trimestre do ano, o nowcast seria o calendário.
 
-  # ---------------------------------------------------------------- F6, interface
+  # ---------------------------------------------------------------- 08, interface
   - id: M050
-    fase: F6
+    fase: "08"
     nome: "Painel gerado a partir do roadmap"
     estado: validado
     depende_de: []
