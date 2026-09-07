@@ -498,9 +498,27 @@ lacunas:
 
   - id: L04
     gravidade: baixa
-    titulo: "O Ollama está no roteamento e nunca foi exercitado neste projeto"
+    titulo: "O Ollama serve para trabalho mecânico, não para revisão"
     onde: "AGENTS.md, seção 5"
-    estado: aberta
+    estado: mitigada
+    nota: >
+      MITIGADA por medição em 06/09/2026, que era o que faltava: a linha do Ollama na tabela de
+      roteamento nunca tinha sido exercida e portanto era suposição.
+      Exercido `qwen3-coder:30b` na revisão de `app/pages/2_modelos.py`, a tarefa que a tabela
+      afirma que ele faz ("segunda revisão gratuita de PRs"). Quatro achados em 40 segundos e
+      1.795 tokens de entrada, sem custo de cota. Verificados um a um: **um fraco mas defensável**
+      (erro de chave se um modelo devolver `coefficients` sem a coluna `name`, o que nenhum dos
+      atuais faz) e **três errados** — afirmou que `.astype(str)` não resolve tipos mistos
+      (resolve), confundiu conversão para exibição com cálculo, e alegou cache com `Path` não
+      hashável numa função que não recebe argumento nenhum.
+      O padrão é reconhecível: ele reconhece a FORMA de defeitos comuns e não confere se o código
+      tem aquela forma. Comparado ao agy na mesma tarefa — quatro de seis áreas com achado real,
+      um deles grave — a diferença não é de grau.
+      Conclusão para o roteamento: **não é segundo revisor.** Continua adequado ao que se verifica
+      por compilador ou teste em vez de por julgamento — docstrings, entradas de catálogo a partir
+      de lista, gravação de fixtures — onde ser gratuito e local é vantagem real.
+      A linha do AGENTS.md muda quando a fila de PRs esvaziar; hoje três branches já tocam aquele
+      arquivo.
 
 decisoes:
   - id: D01
@@ -550,6 +568,17 @@ decisoes:
     arquivo: AGENTS.md
     reabrir_quando: nunca
     nota: "Escrita depois de eu mesclar meus PRs 37 e 38 seis minutos antes de olhar os do Jules."
+
+  - id: D10
+    titulo: "Como uma tarefa chega ao Jules"
+    resposta: >
+      Pela etiqueta `jules` na issue, junto de `agent:jules` e `wp`. Medido em 06/09/2026: as seis
+      issues que ele pegou têm as três; a #44, que eu abri só com `bug`, ficou cinco horas parada
+      e o despacho nunca chegou nele. Etiquetar é o gatilho, não abrir a issue.
+    reabrir_quando: "A integração do Jules mudar de mecanismo."
+    nota: >
+      Vale mover para a seção 5 do AGENTS.md quando a fila de PRs esvaziar — hoje três branches
+      abertas já tocam aquele arquivo e uma quarta edição só criaria conflito.
 
   - id: D09
     titulo: "O que a fase 08 é: aplicativo ou página gerada"
@@ -614,6 +643,12 @@ validacao:
 
   - regra: "A vista não calcula: nenhuma tela importa modelo ou faz conta"
     fonte: "tests/test_app.py::test_a_tela_de_modelos_nao_estima_por_conta_propria"
+
+  - regra: "Toda entrada da tabela de roteamento foi exercida ao menos uma vez, e corrigida pelo que se mediu"
+    fonte: "roadmap.yml"
+    nota: >
+      Não é teste automatizado, e por isso está nomeada: as quatro entradas — Claude, Jules,
+      Antigravity e Ollama — foram todas revistas depois de usadas, e três das quatro mudaram.
 
 backlog:
   - id: B01
