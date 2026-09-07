@@ -27,6 +27,9 @@ dependencies = [
 [project.optional-dependencies]
 # Analysis stack arrives with the analyses (WP-04+); kept here so `uv sync --extra models` is stable.
 models = ["statsmodels>=0.15", "scipy>=1.14"]
+# A vista da fase 08. Extra e não dependência: a base atualiza sozinha numa máquina que não
+# precisa de interface, e o agendador não deve arrastar um servidor web para rodar.
+app = ["streamlit>=1.40"]
 
 [project.scripts]
 econbase = "econbase.cli:app"

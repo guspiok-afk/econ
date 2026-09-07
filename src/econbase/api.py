@@ -13,6 +13,7 @@ worth running.
 from __future__ import annotations
 
 import datetime as dt
+import warnings
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,17 @@ from econbase import schemas, transforms
 from econbase.catalog import Catalog, SeriesSpec
 from econbase.settings import Settings, get_settings
 from econbase.store import Store
-from econbase.vintages import VINTAGE_KINDS, VintageError, availability, pseudo_asof
+from econbase.vintages import (
+    VINTAGE_KINDS,
+    VintageError,
+    availability,
+    describe_split,
+    pseudo_asof,
+)
+
+
+class VintageMixWarning(UserWarning):
+    """Um painel cujas colunas não sabem o mesmo sobre a mesma data."""
 
 
 class ApiError(ValueError):
@@ -138,6 +149,17 @@ class Api:
                     "'mixed' to take real vintages where they exist and simulate elsewhere."
                 )
         else:
+            # `pseudo` sobre série que TEM vintages gravadas descarta a história e devolve o valor
+            # de hoje retrodatado. É o que foi pedido — e é a diferença entre um backtest e um
+            # backtest que já sabe a resposta, então não passa em silêncio.
+            if kind == "pseudo" and have.has_true_vintages:
+                warnings.warn(
+                    f"{key.series_id} tem vintages gravadas e foi pedida como 'pseudo': a "
+                    "história real está sendo ignorada em favor do valor atual, retrodatado. "
+                    "Use 'true' para a história como ela foi publicada.",
+                    VintageMixWarning,
+                    stacklevel=3,
+                )
             frame = pseudo_asof(every, key.spec, asof)
 
         self._last_kind[key.series_id] = kind
@@ -266,11 +288,48 @@ class Api:
                 index=pd.DatetimeIndex(pd.to_datetime(frame["period"])),
                 name=label,
             )
-        panel = pd.concat(columns.values(), axis=1, join="inner" if how == "inner" else "outer")
+        # sort=False de propósito: o pandas 4 muda o padrão e avisa, e a ordenação vem logo
+        # abaixo de qualquer forma. Deixar o aviso seria deixar uma quebra marcada para depois.
+        panel = pd.concat(
+            columns.values(), axis=1, join="inner" if how == "inner" else "outer", sort=False
+        )
         panel = panel.sort_index()
         panel.index = pd.DatetimeIndex(panel.index)
         panel.index.name = "period"
-        return _trim_index(panel, _as_date(start, "start"), _as_date(end, "end"))
+        panel = _trim_index(panel, _as_date(start, "start"), _as_date(end, "end"))
+
+        # Qual vintage cada coluna acabou usando, preso ao próprio painel.
+        #
+        # `mixed` resolve série a série, e num painel isso produz colunas que sabem coisas
+        # diferentes sobre o mesmo instante: uma série com vintages reais volta na versão crua da
+        # época, enquanto uma simulada volta com o valor de hoje, já revisado, retrodatado. A
+        # divisão existia em `describe_split` e não chegava a quem lê o painel — o que faz dela
+        # rótulo, não informação. Agora viaja com o dado, e um painel que mistura os dois avisa.
+        used = {
+            label: self._last_kind.get(self.resolve(k, ent).series_id, vintage_kind)
+            for k, ent, label in targets
+        }
+        panel.attrs["vintage_kinds"] = used
+        panel.attrs["vintage_split"] = describe_split(used)
+        if len({v for v in used.values() if v in ("true", "pseudo")}) > 1:
+            warnings.warn(
+                "este painel mistura vintages gravadas e simuladas "
+                f"({panel.attrs['vintage_split']}): as colunas não sabem o mesmo sobre a mesma "
+                "data. Ver panel.attrs['vintage_kinds'].",
+                VintageMixWarning,
+                stacklevel=2,
+            )
+        return panel
+
+    def vintage_used(self, key: str, entity: str | None = None) -> str | None:
+        """Qual vintage a última leitura desta série usou, ou ``None`` se ela não foi lida.
+
+        `get_panel` prende a divisão ao próprio painel em `attrs`, mas `get` devolve um frame por
+        série e não teria onde pendurá-la. Uma vista que mostra uma série de cada vez precisa da
+        resposta assim mesmo: dizer "como era em junho de 2018" sem dizer se aquilo foi lido de
+        uma vintage gravada ou simulado a partir da defasagem é dizer metade.
+        """
+        return self._last_kind.get(self.resolve(key, entity).series_id)
 
     # ------------------------------------------------------------------ metadata
     def series(self) -> pa.Table:

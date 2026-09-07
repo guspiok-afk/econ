@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "painel",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--extra",
+        "app",
+        "--extra",
+        "models",
+        "streamlit",
+        "run",
+        "app/painel.py",
+        "--server.port",
+        "8502",
+        "--server.headless",
+        "true"
+      ],
+      "port": 8502
+    }
+  ]
+}

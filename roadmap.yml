@@ -1,0 +1,809 @@
+schema: econ/roadmap/1
+
+# O que existe, o que falta, o que se decidiu e o que ainda não se sabe.
+#
+# Mesmo formato do `roadmap.yml` do Projeto Finanças e do PMA, adotado em 06/09/2026 porque as
+# sete fases do `.pma/project.yaml` são grossas demais para acompanhar trabalho: elas dizem que a
+# fase 5 está "em curso" e não dizem o que dentro dela está preso, por quê, nem qual teste garante
+# o que já foi entregue.
+#
+# A regra que faz este arquivo valer alguma coisa é `preso_por`: todo marco validado nomeia os
+# testes que o sustentam. Marco sem `preso_por` não é validado, é afirmado. Os dois defeitos
+# achados em 06/09 — o backtest lendo o trimestre que dizia estimar, e a coleta diária lida como
+# histórico de revisão — passaram por suíte verde justamente porque o que os prendia não existia.
+#
+# `.pma/project.yaml` continua sendo o manifesto que o PMA lê. Este arquivo é o detalhe.
+
+projeto:
+  id: econ
+  nome: Base econômica e camada de análises
+  repo: guspiok-afk/econ
+  raiz: C:\dev\econ
+  desde: 2026-09-03
+  fonte_da_verdade: >
+    Parquet em %LOCALAPPDATA%\econbase\data\lake, com troca atômica de manifesto. O arquivo
+    DuckDB é cache reconstruível por `econbase rebuild-db` e nunca é a verdade.
+
+fases:
+  # Ids e ordem iguais aos de `.pma/project.yaml`, que é o manifesto que o PMA lê. Este arquivo
+  # numerava de zero (F0) e o manifesto de um (01), então cada fase aparecia uma unidade acima
+  # lá — e o deslocamento nem era constante, porque a interface entrava antes de ativos aqui e
+  # depois dele lá. Duas convenções e duas ordens para o mesmo projeto: agora, uma só.
+  - {id: "01", nome: "Fundação: contrato, armazenamento, pipeline bitemporal", estado: fechada}
+  - {id: "02", nome: "Conectores e catálogo", estado: fechada}
+  - {id: "03", nome: "Transformações, API e automação", estado: fechada}
+  - {id: "04", nome: "Análises tier 1", estado: fechada}
+  - {id: "05", nome: "Nowcasting e índices", estado: aberta}
+  - {id: "06", nome: "DSGE", estado: a_fazer}
+  - {id: "07", nome: "Preços de ativos (projeto irmão, mesmo repositório)", estado: a_fazer}
+  - {id: "08", nome: "Interface funcional sobre a base e os modelos", estado: a_fazer}
+
+modulos:
+  # ---------------------------------------------------------------- 01, fundação
+  - id: M001
+    fase: "01"
+    nome: "Contrato de dados e esquemas"
+    estado: validado
+    depende_de: []
+    criterio_aceite: >
+      observations(series_id, period, value, realtime_start, realtime_end, observed_at, run_id)
+      com chave lógica (series_id, period, realtime_start); ids imutáveis `{source}:{native_id}`.
+    preso_por: ["tests/test_schemas.py", "tests/test_catalog_ids.py"]
+
+  - id: M002
+    fase: "01"
+    nome: "Store: Parquet como verdade, troca atômica de manifesto"
+    estado: validado
+    depende_de: [M001]
+    criterio_aceite: >
+      Escrita em staging e troca de manifest.json atômica; views obs_latest/obs_asof/
+      obs_first_release; rebuild-db e gc idempotentes.
+    preso_por: ["tests/test_store.py"]
+
+  - id: M003
+    fase: "01"
+    nome: "Pipeline bitemporal: intervalos ALFRED, não snapshots"
+    estado: validado
+    depende_de: [M002]
+    criterio_aceite: >
+      Duas coletas com valor alterado geram dois intervalos [start, end) com fim exclusivo;
+      check_invariants recusa sobreposição, intervalo invertido e mais de uma linha aberta.
+    preso_por: ["tests/test_pipeline.py", "tests/test_pipeline_guards.py"]
+    nota: >
+      Revisado adversarialmente em 06/09/2026 pelo Antigravity: três das seis áreas sem defeito
+      real, um achado refutado por medição (VALUE_ATOL é 1e-12, não 1e-8) e um com mecanismo
+      certo e severidade invertida — uma fonte que reescreva o próprio histórico faz o pipeline
+      RECUSAR, não corromper. Registrado em teste.
+
+  - id: M004
+    fase: "01"
+    nome: "Guarda contra escrita redirecionada"
+    estado: validado
+    depende_de: [M002]
+    criterio_aceite: >
+      Uma sonda comportamental detecta redirecionamento MSIX de escrita e a Transaction recusa,
+      a menos que ECONBASE_ALLOW_REDIRECTED_WRITES esteja ligado de propósito.
+    preso_por: ["tests/test_redirected_writes.py", "tests/test_settings.py"]
+    nota: >
+      Nasceu do episódio em que declarei a base perdida com base num teste de arquivo-marcador
+      inválido — a listagem de diretório é mesclada no MSIX, a escrita não. Nada havia se perdido.
+
+  - id: M005
+    fase: "01"
+    nome: "Guarda de árvore: uma mesclagem não pode apagar trabalho"
+    estado: validado
+    depende_de: []
+    criterio_aceite: "28 caminhos que devem existir, mais pisos por padrão de arquivo."
+    preso_por: ["tests/test_tree.py"]
+    nota: "Escrito depois que a mesclagem do PR 23 apagou 4.290 linhas em 43 arquivos."
+
+  # ---------------------------------------------------------------- 02, conectores
+  - id: M010
+    fase: "02"
+    nome: "Conectores: FRED, BCB (SGS, PTAX, Focus), SIDRA, IPEA, DBnomics, arquivo HTTP"
+    estado: validado
+    depende_de: [M003]
+    criterio_aceite: >
+      Cada conector com respostas HTTP gravadas; FRED busca o realtime completo, que o fredapi
+      não expõe.
+    preso_por: ["tests/test_source_fred.py", "tests/test_source_bcb.py", "tests/test_source_sidra_ipea.py", "tests/test_source_dbnomics_files.py"]
+
+  - id: M011
+    fase: "02"
+    nome: "Catálogo inicial"
+    estado: validado
+    depende_de: [M010]
+    criterio_aceite: "Séries carregando por conceito e entidade, com licença e redistribuibilidade."
+    preso_por: ["tests/test_catalog.py", "tests/test_catalog_br.py", "tests/test_catalog_us.py", "tests/test_catalog_ids.py"]
+    nota: >
+      73 séries contra as ~120 planejadas: 42 BR, 30 US, 1 global. 33 não redistribuíveis, o que
+      mantém a página de conferência local. As que faltam são de menor prioridade e nenhuma trava
+      um modelo.
+
+  # ---------------------------------------------------------------- 03, API e automação
+  - id: M020
+    fase: "03"
+    nome: "API por conceito, com corte por data de conhecimento"
+    estado: validado
+    depende_de: [M011]
+    criterio_aceite: >
+      api.get e api.get_panel aceitam conceito, série ou (conceito, entidade); ordem fixa —
+      ler as-of, converter frequência, transformar, aparar por data.
+    preso_por: ["tests/test_api.py"]
+
+  - id: M021
+    fase: "03"
+    nome: "Rotina diária no agendador local"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: "Duas execuções por dia, com registro em `runs` e log legível."
+    preso_por: ["tests/test_daily_script.py"]
+    nota: "Medido em 06/09/2026: execução das 12:15 com 73 séries e zero erros."
+
+  - id: M022
+    fase: "03"
+    nome: "Página de conferência das séries"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: >
+      Um HTML autocontido com gráfico por série e auditoria ordenada por gravidade
+      (pico_isolado, estagnada, lacuna, parada, sem_dados, tudo_nulo).
+    preso_por: ["tests/test_report.py"]
+    nota: "Local por obrigação: 33 das 73 séries não são redistribuíveis."
+
+  # ---------------------------------------------------------------- 04, análises
+  - id: M030
+    fase: "04"
+    nome: "Guarda de painel: `requires` passa a significar alguma coisa"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: >
+      column_for resolve só conceito@entidade, sem adivinhação; check_frequency recusa grade
+      fora do padrão e com buracos; panel_for finalmente lê model.requires.
+    preso_por: ["tests/test_panel_guard.py"]
+    nota: >
+      Até existir, dois modelos adivinhavam a coluna e a declaração de frequência era decorativa:
+      um deslocamento de quatro linhas num painel mensal virava variação anual com seis pontos
+      percentuais de erro e nenhum aviso.
+
+  - id: M031
+    fase: "04"
+    nome: "Paridade descoberta de juros, regressão de Fama"
+    estado: validado
+    depende_de: [M030]
+    criterio_aceite: "Erros-padrão de Newey-West para janelas sobrepostas."
+    preso_por: ["tests/test_parity.py"]
+    nota: "β = −0,628 ao vivo — o sinal negativo clássico, contra a hipótese nula de 1."
+
+  - id: M032
+    fase: "04"
+    nome: "Regra de Taylor com variantes e hiato por filtro"
+    estado: validado
+    depende_de: [M030]
+    criterio_aceite: "Reproduz Taylor 1993; hiato calculado sobre o painel as-of."
+    preso_por: ["tests/test_taylor.py"]
+    nota: >
+      US prescrito 6,40 contra 3,63 efetivo; BR 9,94 contra 14,25. O número brasileiro está
+      SUSPENSO pela lacuna C1: o hiato foi filtrado sobre série sazonal.
+
+  - id: M033
+    fase: "04"
+    nome: "VAR monetário com identificação recursiva"
+    estado: validado
+    depende_de: [M030]
+    criterio_aceite: "IRFs por Cholesky, com o quebra-cabeça dos preços preservado e não escondido."
+    preso_por: ["tests/test_var.py"]
+
+  - id: M034
+    fase: "04"
+    nome: "Curva de Phillips do BCB, e uma especificação é um arquivo"
+    estado: validado
+    depende_de: [M030]
+    criterio_aceite: >
+      Spec em YAML validado por pydantic, com spec_id e spec_hash; verticalidade imposta somando
+      exatamente 1,0000; controle negativo deliberado ao lado.
+    preso_por: ["tests/test_phillips.py", "tests/test_specs.py"]
+    nota: >
+      ADR-0007. O teste de aceitação original exigia bater a margem do Focus medida numa
+      especificação mais crua; a do Banco perde por 11%. O teste passou a reportar a razão em vez
+      de servir de portão — erro meu, corrigido medindo.
+
+  - id: M035
+    fase: "04"
+    nome: "Projeções locais de Jordà"
+    estado: validado
+    depende_de: [M030]
+    criterio_aceite: >
+      Uma regressão por horizonte, HAC com maxlags=h; piso de observações que ESCALA com os
+      parâmetros; horizonte zero não é estimado nem contado.
+    preso_por: ["tests/test_local_projections.py"]
+    nota: >
+      Vale do produto −1,0156 em h=10. As guardas vieram da implementação do Jules (PR 39), que
+      passava 16/16 nos meus testes de aceitação e era melhor que a minha em quatro pontos.
+
+  - id: M036
+    fase: "04"
+    nome: "VAR identificado por restrições de sinal"
+    estado: validado
+    depende_de: [M033]
+    criterio_aceite: >
+      O resultado é um conjunto, com banda e taxa de aceitação nas diagnósticas; guarda de
+      amostra que conta o que as defasagens consomem.
+    preso_por: ["tests/test_sign_restrictions.py"]
+    nota: >
+      Transforma +0,3779 do recursivo em −0,1427; aceitação 2,03%, caindo para 0,13% com
+      restrição de cinco anos. Guardas vindas do Jules (PR 40), 18/18.
+
+  # ---------------------------------------------------------------- 05, nowcasting
+  - id: M040
+    fase: "05"
+    nome: "Simulador de vintages: reconstruir o que era conhecido"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: >
+      published_at = fim do período + expected_lag_days; pseudo_asof nunca devolve linha que não
+      estaria publicada; `true` sobre série sem vintages levanta VintageError em vez de devolver
+      vazio; SÓ o catálogo decide se a série tem vintages reais.
+    preso_por: ["tests/test_vintages.py"]
+    nota: >
+      A cláusula final foi escrita depois do defeito: uma heurística lia coleta diária rotineira
+      como histórico de revisão — `bcb_sgs:432` tinha três realtime_start após três dias — e a
+      Selic brasileira as-of 2024 voltava com ZERO linhas em silêncio, que é a falha que este
+      módulo existe para acabar. Achado por revisão delegada ao Antigravity, PR 47.
+
+  - id: M041
+    fase: "05"
+    nome: "Painel irregular: get_panel(mixed_freq=True)"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: >
+      Série mais grossa que a grade mantém seus períodos nativos e os buracos ficam vazios; série
+      mais FINA continua sendo agregada, porque deixada nativa cairia fora da grade e seria
+      descartada em silêncio pelo reindex; subir frequência continua recusado.
+    preso_por: ["tests/test_api.py"]
+
+  - id: M042
+    fase: "05"
+    nome: "Fator dinâmico de frequência mista, para nowcasting"
+    estado: em_revisao
+    depende_de: [M040, M041]
+    criterio_aceite: >
+      Nowcast para trimestre sem alvo publicado; status distingue pending de backfill e gap;
+      transformação de estacionariedade declarada por conceito, sem adivinhar; alvo sazonal é
+      RECUSADO; o backtest não pode ver o alvo do trimestre que estima.
+    preso_por: ["tests/test_dfm.py"]
+    nota: >
+      PR 42. EUA 2026Q3 em +0,663% no trimestre. RMSE 0,818 contra 2,065 da média incondicional
+      em 2018–2025, e 0,501 contra 0,423 nos anos calmos desde 2022 — os dois afirmados em teste
+      para que nenhum circule sozinho. A cláusula final do critério nasceu de defeito achado por
+      revisão delegada: a série trimestral fica na grade no mês em que o trimestre COMEÇA, e o
+      corte por data de referência entregava ao modelo o alvo que ele dizia estimar.
+
+  - id: M043
+    fase: "05"
+    nome: "Backtest pseudo-tempo-real armazenado no store de resultados"
+    estado: a_fazer
+    depende_de: [M042]
+    criterio_aceite: >
+      model_runs e model_outputs gravados com git_sha, seed e vintage_kind; o relatório distingue
+      vintage real de simulada por série, sem agregar as duas num número só.
+    nota: >
+      Sem `preso_por` porque nada o prende ainda, e isso é o estado honesto. A primeira versão
+      nomeava `tests/test_results_store.py`, que prende o STORE de resultados — uma dependência
+      já pronta — e não este marco. A guarda contra marco pendente com teste pronto pegou isso na
+      primeira execução dela, que é o mesmo engano do M044 aparecendo de novo: emprestar o teste
+      de um vizinho.
+
+  - id: M044
+    fase: "05"
+    nome: "Decomposição livres × administrados do IPCA"
+    estado: validado
+    depende_de: [M011, M030]
+    criterio_aceite: >
+      Contribuição de cada parte para a inflação de doze meses, com pesos recuperados em janela
+      móvel e somando exatamente 1; a linha de composição fecha a diferença entre somar
+      contribuições mensais e compor doze meses, de modo que as participações somem 1; nome
+      honesto — é a decomposição do BCB, não sticky-price CPI no sentido do Fed de Atlanta.
+    preso_por: ["tests/test_decomposition.py", "tests/test_br_decomposition.py"]
+    nota: >
+      Séries catalogadas em bcb_sgs 11428 (livres) e 4449 (administrados), desde jan/1991. O peso
+      é móvel por medição e não por gosto: numa amostra cheia os administrados pesam 16,1%, mas
+      17,9% de 1995 a 2005, 25,1% de 2006 a 2015 e 25,8% depois — o peso cheio é puxado para
+      baixo pela hiperinflação até 1994 e não serve a nenhum subperíodo. `test_br_decomposition`
+      valida o catálogo, `test_decomposition` valida o modelo; o `preso_por` antes citava só o
+      primeiro, e escapou porque a regra do arquivo só morde marco já validado.
+      A mesma álgebra desce um nível sem mudar nada: os livres são a soma ponderada de serviços e
+      comercializáveis. Medido em 06/09/2026 — serviços pesam 44,6% dos livres e correm a 5,84%
+      em doze meses, contra 2,12% dos comercializáveis. É o padrão brasileiro, e serviços é o que
+      o Banco olha para pressão subjacente.
+
+  - id: M045
+    fase: "05"
+    nome: "LMCI-BR por componentes principais"
+    estado: bloqueado
+    depende_de: [M011]
+    bloqueado_por: [L05]
+    criterio_aceite: "~20 variáveis, com reestimações deixando uma de fora para medir dependência."
+    nota: >
+      Medido em 06/09/2026: o catálogo brasileiro tem UMA série de mercado de trabalho, a taxa de
+      desocupação (sidra:6381/4099, desde mar/2012). Um índice de condições construído sobre uma
+      variável não é um índice — é a variável com outro nome. Fica bloqueado até a L05.
+
+  - id: M046
+    fase: "05"
+    nome: "GSCPI ingerido"
+    estado: validado
+    depende_de: [M010]
+    criterio_aceite: >
+      Planilha do NY Fed pelo conector de arquivo HTTP; entrada de catálogo declarando folha,
+      salto de cabeçalho e `period_is_end`; termos de uso declarados e redistribuição negada;
+      o formato do arquivo trancado por teste SEM copiar o dado.
+    preso_por: ["tests/test_source_nyfed.py"]
+    nota: >
+      Estava marcado como a fazer e já rodava: 344 observações de jan/1998 a ago/2026, atualizadas
+      pelo agendador. Terceiro marco que este arquivo descreveu de memória do plano em vez de do
+      repositório — ver B05.
+      A série é `redistributable: false`, então não há fixture com o dado, e a identidade que a
+      confirma fica medida em vez de testada: média 0,0077 e desvio 1,0013 sobre as 344
+      observações, porque o índice é padronizado na origem. Máximo em dez/2021, 4,431.
+
+  - id: M047
+    fase: "05"
+    nome: "Nowcast do Brasil"
+    estado: bloqueado
+    depende_de: [M042]
+    bloqueado_por: [C1]
+    criterio_aceite: "O mesmo do M042, sobre gdp_real@BR, com seasonal_share abaixo de 0,25."
+    nota: >
+      Hoje o modelo RECUSA rodar o Brasil, e isso é o comportamento certo: com 55,3% da variação
+      explicada pelo trimestre do ano, o nowcast seria o calendário.
+
+  # ---------------------------------------------------------------- 08, interface
+  - id: M050
+    fase: "08"
+    nome: "Painel gerado a partir do roadmap"
+    estado: validado
+    depende_de: []
+    criterio_aceite: >
+      tools/render_roadmap.py lê roadmap.yml e .pma/project.yaml e escreve painel/econ.html
+      autocontido, sem edição manual; todo marco, lacuna aberta e decisão chega à página;
+      lacunas ordenadas por gravidade; conteúdo escapado; nada de placeholder por substituir.
+      `--artifact` emite a mesma página sem esqueleto de documento, para o hospedeiro que fornece
+      o seu — publicada em claude.ai/code/artifact/93f5a13e-3e87-4f86-a439-e3dddbdd9398.
+    preso_por: ["tests/test_render_roadmap.py", "tests/test_roadmap.py"]
+    nota: >
+      Primeiro pedaço da F6, e o que resolve o problema que motivou este arquivo: o painel foi
+      escrito à mão três vezes em dois dias e errou duas — uma fase entregue reportada como
+      pendente, e zero perguntas esperando o mantenedor na mesma hora em que uma bloqueante era
+      registrada. Um gerador tira essa deriva por construção: a página não tem outra fonte.
+
+  - id: M051
+    fase: "08"
+    nome: "Vista Streamlit: navegar as séries e ver o que pode sair da máquina"
+    estado: validado
+    depende_de: [M020, M050]
+    criterio_aceite: >
+      Escolher conceito e entidade, ver a série e sua ficha; um modo "só redistribuível" que
+      esconde as 33 séries de licença restrita; nenhum cálculo dentro do aplicativo.
+    preso_por: ["tests/test_app.py"]
+    nota: >
+      `uv run --extra app streamlit run app/painel.py --server.port 8502`. A porta 8501 já é do
+      painel do projeto finanças nesta máquina — descoberto derrubando o servidor.
+      Exercida pelo `AppTest` do Streamlit e não por captura de tela: o teste roda amanhã. O que
+      ele tranca é o que a ADR promete — que o interruptor de licença ESCONDE de verdade em vez
+      de só trocar uma legenda, que uma série restrita avisa ao aparecer, e que a vista não
+      importa `econmodels`.
+
+  - id: M052
+    fase: "08"
+    nome: "Vintages lado a lado"
+    estado: validado
+    depende_de: [M051, M040]
+    criterio_aceite: >
+      Escolher uma data de conhecimento e ver a série como era e como é; o tipo de vintage de
+      cada coluna aparece na tela, e um painel misturado avisa como avisa na API.
+    preso_por: ["tests/test_app.py"]
+    nota: >
+      `app/pages/1_vintages.py`. Torna visível a razão de a base guardar revisões desde o dia um:
+      da utilização de capacidade americana, 603 dos 617 períodos conhecidos em junho de 2018
+      foram revisados desde então, com revisão máxima de 1,40 ponto.
+      `api.vintage_used` foi acrescentada para a tela poder dizer se a linha antiga é história
+      gravada ou simulação — desenhar as duas com o mesmo traço seria mentir por omissão.
+
+  - id: M054
+    fase: "08"
+    nome: "Boletim publicável: o quadro brasileiro sem depender da máquina ligada"
+    estado: validado
+    depende_de: [M020]
+    criterio_aceite: >
+      Página gerada, autocontida e sem nada a carregar de fora, com um cartão por indicador —
+      valor, unidade, data e faísca; a licença é PORTÃO e não rótulo, e a geração recusa se
+      qualquer série restrita entrar; a cópia para o hospedeiro sai da mesma função que a local.
+    preso_por: ["tests/test_boletim.py"]
+    nota: >
+      `tools/render_boletim.py`. Resolve o caso que o Streamlit não resolve: celular fora da rede
+      e notebook desligado. O preço é ser só leitura e ser um retrato datado.
+      É brasileiro por obrigação, não por escolha: das 73 séries, 40 são redistribuíveis e todas
+      são do BCB e do IBGE. Publicar é republicar, e as 33 do FRED e do NY Fed não permitem.
+      Publicado em claude.ai/code/artifact/74522116-614e-4a93-8d9b-5acc60387b2f.
+      Achou um erro de catálogo ao ser escrito — ver L06 — e um defeito próprio, ver L07.
+      As faíscas viraram gráficos com escala: sem eixo, subir de 3 para 4 e de 300 para 400
+      desenham o mesmo traço. Extremos escritos e linha do zero onde a série cruza.
+      Ganhou uma seção de MODELOS, e ali a regra da licença muda de forma: uma série do FRED não
+      pode ser republicada, mas um coeficiente estimado ou uma contribuição decomposta são
+      trabalho derivado e nosso. Ainda assim tudo que entra é brasileiro e de série aberta — não
+      há razão para chegar perto da fronteira sem precisar.
+      Entram a decomposição (livres 3,03 p.p. contra administrados 1,31 p.p. no IPCA de doze
+      meses) e a curva de Phillips do Banco Central, que marca em cinza o que é indistinguível de
+      zero a dois erros-padrão. A folga do produto está entre eles: 0,0058 com erro de 0,0758.
+      A regra de Taylor fica de fora pelo mesmo motivo do PIB.
+      Acrescentados a pedido do dono: a curva ao longo do tempo contra a Selic — realizado,
+      previsto e taxa de política numa escala só, erro absoluto médio de 2,52 p.p. em 78
+      trimestres, correlação entre erro e Selic de -0,043 — e a comparação da inclinação entre os
+      dois países. Aí a página encosta na fronteira da licença de propósito: a SÉRIE americana
+      vem do FRED e não pode ser republicada, o COEFICIENTE é estatística nossa. Por isso há
+      tabela dos EUA e não gráfico; o gráfico americano vive no aplicativo.
+
+  - id: M053
+    fase: "08"
+    nome: "Rodar um modelo por especificação e comparar variações"
+    estado: validado
+    depende_de: [M051, M034]
+    criterio_aceite: >
+      Escolher `model_id` e especificação, rodar, ver as tabelas do Result; duas especificações
+      lado a lado com o `spec_hash` de cada uma visível. É o pedido original do mantenedor.
+    preso_por: ["tests/test_app.py", "tests/test_run.py"]
+    nota: >
+      `app/pages/2_modelos.py` sobre `econmodels/run.py`, que é onde o caminho especificação →
+      painel → resultado passou a morar. A frequência sai de `model.requires` e não de quem
+      chama: painel na grade errada não falha, desloca por linha o que deveria deslocar por
+      período e devolve número plausível.
+      A tela avisa que ajuste dentro da amostra não ordena especificações, porque o controle
+      negativo ajusta MELHOR — R² 0,40 contra 0,26 — e põe 2,30 na expectativa, onde a
+      verticalidade pediria perto de 1.
+
+lacunas:
+  - id: C1
+    gravidade: alta
+    titulo: "O PIB brasileiro do catálogo não é dessazonalizado"
+    onde: "catalog/br/ibge_sidra.yaml, série sidra:1620/583"
+    estado: aberta
+    espera: mantenedor
+    desde: 2026-09-05
+    nota: >
+      Declara seasonal_adj true e não é: dummies de trimestre explicam 55,3% da variação do
+      crescimento (p = 2,4e-20), contra 0,7% nos EUA. A tabela 1620 é a série encadeada sem
+      ajuste; a dessazonalizada é a 1621. Bloqueia M047 e SUSPENDE o resultado brasileiro de
+      M032, porque filtrar HP uma série sazonal produz um hiato que é em boa parte o calendário.
+      Três opções e uma recomendação em docs/QUESTIONS.md. A decisão muda o contrato de dados.
+
+  - id: L01
+    gravidade: media
+    titulo: "Quatro convenções de período semanal, nenhuma igual à outra"
+    onde: "src/econbase/transforms.py (_PANDAS_RULE), src/econmodels/base.py (_GRID)"
+    estado: despachada
+    nota: >
+      transforms usa W (domingo, fim), base usa W-MON, fred:ICSA rotula sábado e fred:TOTCI
+      quarta. check_frequency recusa TODOS os 3.113 períodos do ICSA, então nenhum modelo
+      consegue declarar freq="W". Issue #44, com Jules. A resposta tem de tratar ICSA como fluxo
+      e TOTCI como estoque medido numa data — o Antigravity errou exatamente aqui.
+
+  - id: L02
+    gravidade: media
+    titulo: "O modo `mixed` pode produzir um painel temporalmente incoerente"
+    onde: "src/econbase/api.py (get_panel), src/econbase/vintages.py"
+    estado: mitigada
+    nota: >
+      Uma série resolvida como `true` volta na versão crua da época; uma resolvida como `pseudo`
+      volta com o valor ATUAL, já revisado, retrodatado. No mesmo painel, uma sabe menos que a
+      outra sobre o mesmo instante. Achado por revisão delegada em 06/09/2026.
+      MITIGADA, não resolvida: o painel passou a carregar `attrs["vintage_kinds"]` e
+      `attrs["vintage_split"]`, e um painel que mistura gravada com simulada emite
+      `VintageMixWarning`. A incoerência continua existindo — ela é do conceito, não do rótulo —
+      mas deixou de ser invisível. Resolver de verdade exigiria ou recusar a mistura, ou
+      reconstruir a primeira divulgação das séries simuladas, que o dado não permite.
+
+  - id: L03
+    gravidade: baixa
+    titulo: "`pseudo` sobre série que TEM vintages reais descarta o histórico em silêncio"
+    onde: "src/econbase/api.py (_observations)"
+    estado: fechada
+    nota: >
+      Pedir pseudo para uma série do FRED usava o valor corrente em vez das vintages gravadas,
+      sem dizer nada — que é a diferença entre medir previsão e medir memória. Agora levanta
+      `VintageMixWarning` nomeando a série, e fica calado onde não há história para descartar.
+
+  - id: L05
+    gravidade: media
+    titulo: "O Brasil tem uma única série de mercado de trabalho catalogada"
+    onde: "catalog/br/ibge_sidra.yaml"
+    estado: aberta
+    nota: >
+      Só a taxa de desocupação (sidra:6381/4099, desde mar/2012). Os conceitos `employment`,
+      `wages` e `labor_conditions_index` existem em concepts.yaml e nenhuma série brasileira os
+      carrega. Bloqueia o M045. O que falta é PNAD Contínua — população ocupada, taxa de
+      participação, rendimento real habitual, horas trabalhadas — e CAGED, admissões e
+      desligamentos. **Não catalogar por adivinhação:** sete de catorze títulos adicionados numa
+      leva anterior estavam errados na primeira tentativa, e identificador errado é invisível.
+      Confirmar tabela e variável no SIDRA antes de escrever a entrada.
+      As três escolhas que dependem do mantenedor — amostra curta da PNAD, emenda com a PME, e a
+      quebra do CAGED em 2020 — estão em docs/QUESTIONS.md, item T1, para conversa e não como
+      bloqueio de execução.
+
+  - id: L06
+    gravidade: media
+    titulo: "A Selic efetiva estava catalogada como taxa anual, e é diária"
+    onde: "catalog/br/bcb_sgs.yaml, série bcb_sgs:11"
+    estado: fechada
+    nota: >
+      Declarava `unit: pct_pa` e é percentual ao dia útil. Confirmado por aritmética: 0,0517% ao
+      dia composto em 252 dias dá 13,9% ao ano, batendo com a meta de 14,00% da mesma data.
+      Nenhum modelo lê esta série, então nada estava errado a jusante — o erro só apareceu quando
+      o boletim a exibiu como "0,05% ao ano", que é absurdo à primeira vista e teria sido
+      publicado. Corrigido para `pct_pd` com o título dizendo qual série do SGS é.
+      A anualizada do SGS é a 1178, que o catálogo ainda não traz.
+      Mesma classe da C1: rótulo de catálogo que ninguém confere porque nada o consome.
+
+  - id: L07
+    gravidade: baixa
+    titulo: "O separador de milhar comeu as vírgulas das coordenadas do SVG"
+    onde: "tools/render_boletim.py"
+    estado: fechada
+    nota: >
+      `.replace(",", MILHAR)` aplicado a um bloco de f-strings adjacentes alcançava não só os
+      números do cartão, mas as COORDENADAS do gráfico embutido nele: `38.0,68.3` virava
+      `38.0 68.3`. O SVG continuou desenhando porque a especificação de `polyline` aceita
+      separação por espaço — falha invisível, e por isso a pior categoria.
+      Interessa o COMO foi pego. O teste de limites da função `_grafico` achou a primeira metade;
+      corrigi a função e a página continuou errada, porque quem aplicava o replace era o CHAMADOR.
+      Só um teste sobre a saída final — não sobre a função — fechou. Testar a unidade não bastou,
+      e está registrado como regra em `validacao`.
+
+  - id: L08
+    gravidade: media
+    titulo: "`annualised_quarterly` aplicada a um índice devolvia dezenas de milhares por cento"
+    onde: "src/econmodels/phillips.py"
+    estado: fechada
+    nota: >
+      A transformação compõe uma TAXA percentual por período. Aplicada ao índice de preços
+      americano — 333 em vez de 0,33 — devolvia 35.047%, e a regressão seguinte rodava sem erro:
+      R² de 0,997, inércia em 1,07, resíduo médio de 266 pontos percentuais. Resultado
+      numericamente plausível para pergunta sem sentido, que é a forma de erro que este
+      repositório mais persegue.
+      Descoberto escrevendo a especificação americana, que não existia. Agora `annualised_quarterly`
+      RECUSA acima de 1000% e diz qual transformação usar, e existe `log_diff_ann` para índice —
+      400 vezes a diferença de log, na mesma unidade, para um coeficiente brasileiro e um
+      americano serem comparáveis sem conversão de cabeça.
+
+  - id: L04
+    gravidade: baixa
+    titulo: "O Ollama serve para trabalho mecânico, não para revisão"
+    onde: "AGENTS.md, seção 5"
+    estado: mitigada
+    nota: >
+      MITIGADA por medição em 06/09/2026, que era o que faltava: a linha do Ollama na tabela de
+      roteamento nunca tinha sido exercida e portanto era suposição.
+      Exercido `qwen3-coder:30b` na revisão de `app/pages/2_modelos.py`, a tarefa que a tabela
+      afirma que ele faz ("segunda revisão gratuita de PRs"). Quatro achados em 40 segundos e
+      1.795 tokens de entrada, sem custo de cota. Verificados um a um: **um fraco mas defensável**
+      (erro de chave se um modelo devolver `coefficients` sem a coluna `name`, o que nenhum dos
+      atuais faz) e **três errados** — afirmou que `.astype(str)` não resolve tipos mistos
+      (resolve), confundiu conversão para exibição com cálculo, e alegou cache com `Path` não
+      hashável numa função que não recebe argumento nenhum.
+      O padrão é reconhecível: ele reconhece a FORMA de defeitos comuns e não confere se o código
+      tem aquela forma. Comparado ao agy na mesma tarefa — quatro de seis áreas com achado real,
+      um deles grave — a diferença não é de grau.
+      Conclusão para o roteamento: **não é segundo revisor.** Continua adequado ao que se verifica
+      por compilador ou teste em vez de por julgamento — docstrings, entradas de catálogo a partir
+      de lista, gravação de fixtures — onde ser gratuito e local é vantagem real.
+      A linha do AGENTS.md muda quando a fila de PRs esvaziar; hoje três branches já tocam aquele
+      arquivo.
+
+decisoes:
+  - id: D01
+    titulo: "Julia para o módulo DSGE"
+    resposta: "Não. Python resolve o modelo de três equações; Julia custaria 75 a 155 horas fixas."
+    arquivo: docs/adr/0004-python-first-dsge-julia-out-of-scope.md
+    reabrir_quando: "Perturbação de ordem superior, restrição de piso de juros, ou biblioteca pronta de modelos médios."
+
+  - id: D02
+    titulo: "Um repositório ou dois"
+    resposta: "Um, com dois pacotes independentes."
+    arquivo: docs/adr/0006-two-packages-one-repository.md
+    reabrir_quando: "Um repositório irmão precisar fixar versão, ou entrar um segundo colaborador."
+
+  - id: D03
+    titulo: "Quem escreve os dados"
+    resposta: "Só o agendador local. A integração contínua roda testes e nunca grava dados."
+    arquivo: docs/adr/0003-single-writer-task-scheduler.md
+    reabrir_quando: "Surgir um leitor remoto ou um aplicativo hospedado."
+
+  - id: D04
+    titulo: "Guardar histórico de revisões desde o início"
+    resposta: >
+      Sim. Já provou o valor: o desemprego americano de abril de 2020 foi publicado em 14,7% e
+      hoje lê 14,8%.
+    arquivo: docs/adr/0002-bitemporal-vintages.md
+    reabrir_quando: nunca
+
+  - id: D05
+    titulo: "Sticky CPI brasileiro"
+    resposta: "Divisão livres × administrados do próprio Banco Central, e o índice muda de nome."
+    reabrir_quando: "Houver microdado de frequência de reajuste, que o Brasil não publica."
+
+  - id: D06
+    titulo: "O que um nowcast precisa provar para entrar"
+    resposta: >
+      Ganho medido contra a média incondicional na amostra completa E a derrota no período calmo
+      afirmada por teste junto. Nenhum dos dois números circula sozinho.
+    reabrir_quando: "Alvo com sazonalidade tratada e história mais longa no Brasil mudar o quadro."
+
+  - id: D07
+    titulo: "Trabalho despachado é despachado"
+    resposta: >
+      Uma vez que um pacote vai para um executor, não se implementa em paralelo. Correr contra
+      ele desperdiça a entrega e produz leitura falsa do que ele consegue fazer — e é dessa
+      leitura que a tabela de roteamento é feita.
+    arquivo: AGENTS.md
+    reabrir_quando: nunca
+    nota: "Escrita depois de eu mesclar meus PRs 37 e 38 seis minutos antes de olhar os do Jules."
+
+  - id: D10
+    titulo: "Como uma tarefa chega ao Jules"
+    resposta: >
+      Pela etiqueta `jules` na issue, junto de `agent:jules` e `wp`. Medido em 06/09/2026: as seis
+      issues que ele pegou têm as três; a #44, que eu abri só com `bug`, ficou cinco horas parada
+      e o despacho nunca chegou nele. Etiquetar é o gatilho, não abrir a issue.
+    reabrir_quando: "A integração do Jules mudar de mecanismo."
+    nota: >
+      Vale mover para a seção 5 do AGENTS.md quando a fila de PRs esvaziar — hoje três branches
+      abertas já tocam aquele arquivo e uma quarta edição só criaria conflito.
+
+  - id: D09
+    titulo: "O que a fase 08 é: aplicativo ou página gerada"
+    resposta: >
+      Aplicativo. Streamlit agora como vista FINA — nenhum cálculo mora nele, toda leitura passa
+      por `econbase.api` e toda estimação por modelo registrado. Uso próprio primeiro, com as
+      costuras de produto deixadas prontas porque são baratas hoje e caras depois.
+      A restrição que decide o que pode virar produto não é técnica: 33 das 73 séries são
+      `redistributable: false`, então um aplicativo vendável não pode servir esses valores a
+      terceiros. O que se pode vender é o derivado — decomposições, estimativas, hiatos,
+      nowcasts — e as séries cuja licença permite. Por isso cada tela declara se depende de série
+      restrita desde a primeira, e não depois.
+    arquivo: docs/adr/0008-the-app-is-a-thin-view-over-the-read-api.md
+    reabrir_quando: >
+      Segundo usuário, ou primeiro consumidor não-Python. Insatisfação com o Streamlit não é
+      gatilho: a decisão foi tomada sabendo que ele é base ruim para produto.
+
+  - id: D08
+    titulo: "Papel do Antigravity headless (`agy`)"
+    resposta: >
+      Segundo par de olhos em UM arquivo, nunca decisor. Não lê arquivos, ~7 mil tokens de
+      contexto por chamada, e custo que torna o lote obrigatório.
+    arquivo: AGENTS.md
+    reabrir_quando: >
+      A CLI passar a ler arquivos em headless sem conceder permissão de comando, ou o teto de
+      contexto deixar de ser a linha de comando do Windows.
+
+validacao:
+  - regra: "Nenhuma linha simulada poderia ter sido desconhecida na data pedida"
+    fonte: "tests/test_vintages.py::test_no_simulated_row_could_have_been_unknown"
+    nota: >
+      Reescrito em 06/09: a primeira versão reafirmava a mesma condição que a função usara para
+      filtrar, então quebrar published_at quebraria os dois juntos. Agora confere contra o
+      calendário, que a função não calcula.
+
+  - regra: "Só o catálogo decide se uma série tem vintages reais"
+    fonte: "tests/test_vintages.py::test_without_a_declaration_there_are_no_true_vintages_whatever_the_rows_look_like"
+
+  - regra: "Uma projeção com menos observações que parâmetros é recusada"
+    fonte: "tests/test_local_projections.py::test_a_projection_with_fewer_observations_than_parameters_is_refused"
+
+  - regra: "Uma mesclagem não pode apagar trabalho"
+    fonte: "tests/test_tree.py"
+
+  - regra: "Uma fonte que reescreva o próprio histórico faz o pipeline recusar, não corromper"
+    fonte: "tests/test_pipeline.py::test_a_vintage_that_vanishes_from_the_source_is_refused_not_absorbed"
+
+  - regra: "As participações de uma decomposição somam exatamente 1, com a composição nomeada"
+    fonte: "tests/test_decomposition.py::test_as_participacoes_somam_um_em_todo_periodo"
+
+  - regra: "Um painel que mistura vintage gravada com simulada avisa, e diz qual coluna é qual"
+    fonte: "tests/test_api.py::test_mixing_recorded_and_simulated_vintages_warns"
+
+  - regra: "O roadmap não descreve como pendente um trabalho cujos testes já existem"
+    fonte: "tests/test_roadmap.py::test_a_milestone_still_to_do_does_not_already_have_its_tests"
+
+  - regra: "Simular vintages de uma série que as tem gravadas avisa antes de descartá-las"
+    fonte: "tests/test_api.py::test_pseudo_over_a_series_that_has_real_vintages_warns"
+
+  - regra: "A frequência de um painel vem do modelo que vai estimá-lo, nunca de quem chama"
+    fonte: "tests/test_run.py::test_a_frequencia_vem_da_declaracao_do_modelo"
+
+  - regra: "A vista não calcula: nenhuma tela importa modelo ou faz conta"
+    fonte: "tests/test_app.py::test_a_tela_de_modelos_nao_estima_por_conta_propria"
+
+  - regra: "Com senha configurada, nenhum dado aparece antes dela — e toda página passa pela porta"
+    fonte: "tests/test_app.py::test_com_senha_a_porta_tranca_antes_do_dado"
+
+  - regra: "A página publicada é conferida como página, e não só pelas funções que a montam"
+    fonte: "tests/test_boletim.py::test_na_pagina_gerada_as_coordenadas_continuam_pares"
+
+  - regra: "Nenhuma série restrita vaza para a página publicada, nem dentro de um gráfico"
+    fonte: "tests/test_boletim.py::test_a_comparacao_entre_paises_traz_so_coeficientes"
+
+  - regra: "Em nenhum dos dois países a inclinação da Phillips se separa de zero"
+    fonte: "tests/test_boletim.py::test_nenhuma_inclinacao_se_separa_de_zero"
+    nota: >
+      Medida, não suposta: Brasil +0,006 com erro 0,076; Estados Unidos +0,108 com erro 0,178 e
+      ainda com o sinal trocado. O teste falha se isso mudar, obrigando a atualizar o texto da
+      página antes de mexer no número.
+
+  - regra: "Toda entrada da tabela de roteamento foi exercida ao menos uma vez, e corrigida pelo que se mediu"
+    fonte: "roadmap.yml"
+    nota: >
+      Não é teste automatizado, e por isso está nomeada: as quatro entradas — Claude, Jules,
+      Antigravity e Ollama — foram todas revistas depois de usadas, e três das quatro mudaram.
+
+backlog:
+  - id: B06
+    titulo: "Acesso pelo celular"
+    estado: aprovado
+    espera: mantenedor
+    nota: >
+      As telas cabem em tela estreita (abas no lugar de colunas) e a vista ganhou senha, que era
+      o obstáculo de verdade. O que falta é decisão de rede, e é do dono.
+      O PROBLEMA NÃO ERA A PORTA: era o Streamlit não ter autenticação, de modo que servir fora
+      da máquina abria o painel inteiro — 33 séries não redistribuíveis incluídas — a quem
+      estivesse na rede. Abrir o firewall antes de resolver isso trocaria um problema por um
+      pior. Com `ECONBASE_APP_PASSWORD` no `.env`, quem entra volta a ser escolha do dono.
+      Caminho recomendado: rede local, com senha preenchida, servindo em 0.0.0.0 e uma regra de
+      firewall no perfil privado. A máquina está em 10.0.0.95, Wi-Fi privada. Os comandos ficaram
+      com o dono porque exposição de rede e regra de firewall são decisão dele — e escrever um
+      script que juntasse as duas coisas foi recusado pelo classificador, corretamente.
+      Não fazer túnel para a internet sem autenticação melhor que uma senha compartilhada.
+
+  - id: B01
+    titulo: "Interface funcional sobre a base e os modelos"
+    estado: aprovado
+    nota: >
+      Pedido do dono: a base E a interface, em nível funcional, para analisar variações e
+      conferir se as séries estão corretas. Não havia fase para isso no plano original; virou F6.
+      Precisa navegar séries, ver vintages lado a lado e rodar um modelo por especificação.
+
+  - id: B02
+    titulo: "Renderizador do painel a partir deste arquivo"
+    estado: feito
+    nota: >
+      Entregue em 06/09/2026 como M050. `uv run python tools/render_roadmap.py` escreve
+      painel/econ.html, e `--artifact` gera a cópia publicada, que passou a sair daqui em vez de
+      ser escrita à mão. O mesmo endereço de antes, para abrir do celular.
+
+  - id: B03
+    titulo: "Devolver a validacao do fator dinamico quando o PR 42 entrar"
+    estado: aprovado
+    nota: >
+      Duas regras foram tiradas da seção `validacao` porque nomeiam testes que ainda vivem no
+      PR 42: o trimestre não observado estimado sem o próprio alvo, e o alvo sazonal recusado
+      pelo nome. Voltam com a mesclagem. O teste que exige que toda fonte exista é o que obriga
+      esta anotação a não virar dívida silenciosa.
+
+  - id: B05
+    titulo: "Marco marcado como a fazer que já está pronto: pegar isso automaticamente"
+    estado: feito
+    nota: >
+      Três vezes em 06/09/2026 este arquivo descreveu como pendente algo que já existia — M044,
+      M046 e a fase 8. A causa é sempre a mesma: escrevi de memória do plano e não do repositório.
+      A regra de `preso_por` só morde marco já validado, então nada olha para o outro lado.
+      Implementado no mesmo dia como
+      `test_a_milestone_still_to_do_does_not_already_have_its_tests`: marco em `a_fazer` cujos
+      testes de `preso_por` TODOS existem levanta suspeita. Não é prova, é sinalização — e é
+      barata, porque marco sem `preso_por` nem é olhado.
+
+  - id: B04
+    titulo: "Proteção de branch na main"
+    estado: aprovado
+    espera: mantenedor
+    nota: >
+      Bloquear force-push e deleção, exigir PR e CI verde, e NÃO exigir aprovação — o GitHub não
+      deixa aprovar o próprio PR e o mantenedor é o único humano.
