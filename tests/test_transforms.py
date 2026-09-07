@@ -40,6 +40,14 @@ def test_monthly_to_quarterly_with_each_aggregation() -> None:
     assert list(eop["value"]) == list(last["value"]), "eop and last are synonyms here"
 
 
+def test_daily_to_weekly_resample_7d() -> None:
+    f = frame([(f"2024-01-{d:02d}", float(d)) for d in range(1, 15)])
+    out = transforms.resample(f, from_freq="D", to_freq="W", agg="mean")
+    assert list(out["period"]) == [dt.date(2024, 1, 1), dt.date(2024, 1, 8)]
+    assert math.isclose(float(out["value"].iloc[0]), 4.0)
+    assert math.isclose(float(out["value"].iloc[1]), 11.0)
+
+
 def test_daily_to_monthly_skips_days_that_do_not_exist() -> None:
     f = frame([("2026-01-02", 4.1), ("2026-01-05", 4.3), ("2026-02-02", 4.5)])
     out = transforms.resample(f, from_freq="B", to_freq="M", agg="mean")

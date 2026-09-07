@@ -35,7 +35,7 @@ PERIODS_PER_YEAR: dict[str, float] = {
 #: Coarser frequencies have a higher rank; a downsample moves up.
 _RANK: dict[str, int] = {"D": 0, "B": 1, "W": 2, "M": 3, "Q": 4, "A": 5}
 
-_PANDAS_RULE: dict[str, str] = {"D": "D", "B": "B", "W": "W", "M": "MS", "Q": "QS", "A": "YS"}
+_PANDAS_RULE: dict[str, str] = {"D": "D", "B": "B", "W": "7D", "M": "MS", "Q": "QS", "A": "YS"}
 
 
 class TransformError(ValueError):
