@@ -377,6 +377,41 @@ modulos:
       pendente, e zero perguntas esperando o mantenedor na mesma hora em que uma bloqueante era
       registrada. Um gerador tira essa deriva por construção: a página não tem outra fonte.
 
+  - id: M051
+    fase: "08"
+    nome: "Vista Streamlit: navegar as séries e ver o que pode sair da máquina"
+    estado: validado
+    depende_de: [M020, M050]
+    criterio_aceite: >
+      Escolher conceito e entidade, ver a série e sua ficha; um modo "só redistribuível" que
+      esconde as 33 séries de licença restrita; nenhum cálculo dentro do aplicativo.
+    preso_por: ["tests/test_app.py"]
+    nota: >
+      `uv run --extra app streamlit run app/painel.py --server.port 8502`. A porta 8501 já é do
+      painel do projeto finanças nesta máquina — descoberto derrubando o servidor.
+      Exercida pelo `AppTest` do Streamlit e não por captura de tela: o teste roda amanhã. O que
+      ele tranca é o que a ADR promete — que o interruptor de licença ESCONDE de verdade em vez
+      de só trocar uma legenda, que uma série restrita avisa ao aparecer, e que a vista não
+      importa `econmodels`.
+
+  - id: M052
+    fase: "08"
+    nome: "Vintages lado a lado"
+    estado: a_fazer
+    depende_de: [M051, M040]
+    criterio_aceite: >
+      Escolher uma data de conhecimento e ver a série como era e como é; o tipo de vintage de
+      cada coluna aparece na tela, e um painel misturado avisa como avisa na API.
+
+  - id: M053
+    fase: "08"
+    nome: "Rodar um modelo por especificação e comparar variações"
+    estado: a_fazer
+    depende_de: [M051, M034]
+    criterio_aceite: >
+      Escolher `model_id` e especificação, rodar, ver as tabelas do Result; duas especificações
+      lado a lado com o `spec_hash` de cada uma visível. É o pedido original do mantenedor.
+
 lacunas:
   - id: C1
     gravidade: alta
@@ -499,6 +534,22 @@ decisoes:
     arquivo: AGENTS.md
     reabrir_quando: nunca
     nota: "Escrita depois de eu mesclar meus PRs 37 e 38 seis minutos antes de olhar os do Jules."
+
+  - id: D09
+    titulo: "O que a fase 08 é: aplicativo ou página gerada"
+    resposta: >
+      Aplicativo. Streamlit agora como vista FINA — nenhum cálculo mora nele, toda leitura passa
+      por `econbase.api` e toda estimação por modelo registrado. Uso próprio primeiro, com as
+      costuras de produto deixadas prontas porque são baratas hoje e caras depois.
+      A restrição que decide o que pode virar produto não é técnica: 33 das 73 séries são
+      `redistributable: false`, então um aplicativo vendável não pode servir esses valores a
+      terceiros. O que se pode vender é o derivado — decomposições, estimativas, hiatos,
+      nowcasts — e as séries cuja licença permite. Por isso cada tela declara se depende de série
+      restrita desde a primeira, e não depois.
+    arquivo: docs/adr/0008-the-app-is-a-thin-view-over-the-read-api.md
+    reabrir_quando: >
+      Segundo usuário, ou primeiro consumidor não-Python. Insatisfação com o Streamlit não é
+      gatilho: a decisão foi tomada sabendo que ele é base ruim para produto.
 
   - id: D08
     titulo: "Papel do Antigravity headless (`agy`)"
