@@ -426,7 +426,17 @@ modulos:
       É brasileiro por obrigação, não por escolha: das 73 séries, 40 são redistribuíveis e todas
       são do BCB e do IBGE. Publicar é republicar, e as 33 do FRED e do NY Fed não permitem.
       Publicado em claude.ai/code/artifact/74522116-614e-4a93-8d9b-5acc60387b2f.
-      Achou um erro de catálogo ao ser escrito — ver L06.
+      Achou um erro de catálogo ao ser escrito — ver L06 — e um defeito próprio, ver L07.
+      As faíscas viraram gráficos com escala: sem eixo, subir de 3 para 4 e de 300 para 400
+      desenham o mesmo traço. Extremos escritos e linha do zero onde a série cruza.
+      Ganhou uma seção de MODELOS, e ali a regra da licença muda de forma: uma série do FRED não
+      pode ser republicada, mas um coeficiente estimado ou uma contribuição decomposta são
+      trabalho derivado e nosso. Ainda assim tudo que entra é brasileiro e de série aberta — não
+      há razão para chegar perto da fronteira sem precisar.
+      Entram a decomposição (livres 3,03 p.p. contra administrados 1,31 p.p. no IPCA de doze
+      meses) e a curva de Phillips do Banco Central, que marca em cinza o que é indistinguível de
+      zero a dois erros-padrão. A folga do produto está entre eles: 0,0058 com erro de 0,0758.
+      A regra de Taylor fica de fora pelo mesmo motivo do PIB.
 
   - id: M053
     fase: "08"
@@ -527,6 +537,21 @@ lacunas:
       publicado. Corrigido para `pct_pd` com o título dizendo qual série do SGS é.
       A anualizada do SGS é a 1178, que o catálogo ainda não traz.
       Mesma classe da C1: rótulo de catálogo que ninguém confere porque nada o consome.
+
+  - id: L07
+    gravidade: baixa
+    titulo: "O separador de milhar comeu as vírgulas das coordenadas do SVG"
+    onde: "tools/render_boletim.py"
+    estado: fechada
+    nota: >
+      `.replace(",", MILHAR)` aplicado a um bloco de f-strings adjacentes alcançava não só os
+      números do cartão, mas as COORDENADAS do gráfico embutido nele: `38.0,68.3` virava
+      `38.0 68.3`. O SVG continuou desenhando porque a especificação de `polyline` aceita
+      separação por espaço — falha invisível, e por isso a pior categoria.
+      Interessa o COMO foi pego. O teste de limites da função `_grafico` achou a primeira metade;
+      corrigi a função e a página continuou errada, porque quem aplicava o replace era o CHAMADOR.
+      Só um teste sobre a saída final — não sobre a função — fechou. Testar a unidade não bastou,
+      e está registrado como regra em `validacao`.
 
   - id: L04
     gravidade: baixa
@@ -678,6 +703,9 @@ validacao:
 
   - regra: "Com senha configurada, nenhum dado aparece antes dela — e toda página passa pela porta"
     fonte: "tests/test_app.py::test_com_senha_a_porta_tranca_antes_do_dado"
+
+  - regra: "A página publicada é conferida como página, e não só pelas funções que a montam"
+    fonte: "tests/test_boletim.py::test_na_pagina_gerada_as_coordenadas_continuam_pares"
 
   - regra: "Toda entrada da tabela de roteamento foi exercida ao menos uma vez, e corrigida pelo que se mediu"
     fonte: "roadmap.yml"

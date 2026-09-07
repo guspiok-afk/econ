@@ -89,8 +89,23 @@ def test_a_pagina_tem_um_cartao_por_indicador(pagina: str, boletim) -> None:
 
 
 def test_cada_cartao_traz_valor_unidade_e_data(pagina: str) -> None:
-    for classe in ("valor", "unidade", "quando", "faisca"):
+    for classe in ("valor", "unidade", "quando", "grafico"):
         assert f'class="{classe}"' in pagina
+
+
+def test_na_pagina_gerada_as_coordenadas_continuam_pares(pagina: str) -> None:
+    """Testar a função não bastou, e é a lição desta página.
+
+    `_grafico` devolvia coordenadas corretas e `_cartao` aplicava o separador de milhar ao cartão
+    inteiro, comendo as vírgulas do SVG embutido. O teste da função passava; a página saía com
+    "38.0 68.3" em vez de "38.0,68.3". O SVG continuava desenhando, porque a especificação aceita
+    separação por espaço — falha invisível, do tipo que só a saída final revela.
+    """
+    for pontos in re.findall(r'class="traco[^"]*" points="([^"]+)"', pagina):
+        pares = pontos.split()
+        assert len(pares) > 1
+        for par in pares:
+            assert par.count(",") == 1, f"coordenada sem vírgula: {par!r}"
 
 
 def test_o_carimbo_de_data_esta_visivel(pagina: str) -> None:
@@ -106,27 +121,75 @@ def test_a_ausencia_do_pib_e_explicada(pagina: str) -> None:
     assert "C1" in pagina
 
 
-# ------------------------------------------------------------------ a faísca
-def test_a_faisca_e_svg_sem_nada_a_carregar(boletim) -> None:
+# ------------------------------------------------------------------ os gráficos
+def test_o_grafico_e_svg_sem_nada_a_carregar(boletim) -> None:
     """Uma página que depende de biblioteca externa não abre no celular sem rede boa — e a
     política de conteúdo do hospedeiro bloqueia quase tudo de qualquer forma."""
-    svg = boletim._faisca([1.0, 2.0, 1.5, 3.0])
+    svg = boletim._grafico(
+        [1.0, 2.0, 1.5, 3.0], ["2020-01-01", "2020-02-01", "2020-03-01", "2020-04-01"]
+    )
     assert svg.startswith("<svg") and "polyline" in svg
     assert "http" not in svg and "<script" not in svg
 
 
-def test_uma_serie_de_um_ponto_nao_desenha_faisca(boletim) -> None:
-    assert boletim._faisca([1.0]) == ""
+def test_o_grafico_escreve_os_extremos(boletim) -> None:
+    """A faísca que isto substituiu mostrava a forma e escondia o nível: sem eixo, subir de 3
+    para 4 e de 300 para 400 desenham o mesmo traço."""
+    svg = boletim._grafico([3.0, 9.5, 6.0], ["2019-01-01", "2020-01-01", "2021-06-01"])
+    marcas = re.findall(r'class="marca"[^>]*>([^<]+)<', svg)
+    assert "9.5" in marcas and "3.0" in marcas
+    assert "2019" in marcas
 
 
-def test_a_faisca_cabe_na_propria_caixa(boletim) -> None:
+def test_a_linha_do_zero_aparece_so_quando_a_serie_cruza(boletim) -> None:
+    """Num gráfico de variação o sinal é metade da informação."""
+    datas = ["2020-01-01", "2021-01-01", "2022-01-01"]
+    assert 'class="zero"' in boletim._grafico([-1.0, 0.5, 2.0], datas)
+    assert 'class="zero"' not in boletim._grafico([1.0, 2.0, 3.0], datas)
+
+
+def test_uma_serie_de_um_ponto_nao_desenha_grafico(boletim) -> None:
+    assert boletim._grafico([1.0], ["2020-01-01"]) == ""
+
+
+def test_o_grafico_cabe_na_propria_caixa(boletim) -> None:
     """Coordenada fora da viewBox some sem erro: o traço aparece cortado e ninguém percebe."""
-    svg = boletim._faisca([0.0, 100.0, 50.0], largura=240, altura=44)
-    pontos = re.search(r'points="([^"]+)"', svg).group(1)
-    for par in pontos.split():
+    svg = boletim._grafico([0.0, 100.0, 50.0], ["2020-01-01", "2021-01-01", "2022-01-01"])
+    for par in re.search(r'class="traco" points="([^"]+)"', svg).group(1).split():
         x, y = (float(v) for v in par.split(","))
-        assert 0 <= x <= 240
-        assert 0 <= y <= 44
+        assert 0 <= x <= 320
+        assert 0 <= y <= 150
+
+
+def test_duas_series_dividem_a_mesma_escala(boletim) -> None:
+    """Duas linhas em escalas diferentes no mesmo desenho comparam forma e mentem sobre nível."""
+    datas = ["2020-01-01", "2021-01-01", "2022-01-01"]
+    svg = boletim._duas_linhas([1.0, 2.0, 3.0], [10.0, 11.0, 12.0], datas)
+    marcas = re.findall(r'class="marca"[^>]*>([^<]+)<', svg)
+    assert "12.0" in marcas and "1.0" in marcas, marcas
+    assert svg.count("polyline") == 2
+
+
+# ------------------------------------------------------------------ os modelos
+def test_a_secao_de_modelos_traz_os_dois_e_nenhum_erro(pagina: str) -> None:
+    """Um modelo que não roda vira ausência dita, não exceção exibida: quem lê no celular não
+    tem o que fazer com um nome de classe do Python."""
+    assert "<h2>Modelos</h2>" in pagina
+    assert "De onde vem a inflação" in pagina
+    assert "Curva de Phillips" in pagina
+    assert "não pôde ser gerada" not in pagina
+    assert "TypeError" not in pagina and "Traceback" not in pagina
+
+
+def test_a_curva_marca_o_que_e_indistinguivel_de_zero(pagina: str) -> None:
+    """O resultado que importa nesta amostra: a folga do produto não se separa de zero, que é o
+    que a literatura de identificação previa e não um defeito da estimação."""
+    assert 'class="mudo"' in pagina
+    assert "indistinguível de zero" in pagina
+
+
+def test_a_ausencia_da_regra_de_taylor_e_explicada(pagina: str) -> None:
+    assert "Taylor não aparece" in pagina
 
 
 # ------------------------------------------------------------------ a cópia publicada
