@@ -251,3 +251,16 @@ def test_a_tela_de_modelos_nao_estima_por_conta_propria() -> None:
     assert "run_spec" in fonte
     for proibido in ("OLS(", "statsmodels", ".fit(", "np."):
         assert proibido not in fonte, f"a tela contém {proibido!r}: a conta está no lugar errado"
+
+
+# ------------------------------------------------------------------ tela estreita
+def test_as_telas_usam_abas_e_nao_colunas(app: AppTest, vintages: AppTest) -> None:
+    """No Streamlit colunas NÃO empilham em tela estreita.
+
+    Num celular duas colunas viram duas tiras espremidas lado a lado, e três viram ilegíveis.
+    Abas ocupam a largura toda em qualquer tela e põem a segunda a um toque de distância. É a
+    diferença entre um painel que se usa no aparelho e um que se abre e se fecha.
+    """
+    for tela in (app, vintages):
+        assert len(tela.tabs) >= 2, "as seções de baixo deveriam ser abas"
+        assert not tela.columns, "colunas voltaram: elas não empilham no celular"

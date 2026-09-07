@@ -651,6 +651,25 @@ validacao:
       Antigravity e Ollama — foram todas revistas depois de usadas, e três das quatro mudaram.
 
 backlog:
+  - id: B06
+    titulo: "Acesso pelo celular"
+    estado: proposta
+    espera: mantenedor
+    nota: >
+      As telas foram feitas para caber em tela estreita — abas no lugar de colunas, que no
+      Streamlit não empilham — mas o acesso em si é decisão do dono, porque é exposição de rede.
+      Três caminhos, custos muito diferentes:
+      (a) REDE LOCAL: servir em 0.0.0.0 e abrir a porta no perfil privado do firewall. A máquina
+      em 10.0.0.95, Wi-Fi privada. Grátis e imediato, e expõe o painel INTEIRO sem senha a quem
+      estiver na rede — o Streamlit não tem autenticação.
+      (b) TÚNEL até fora da rede: acrescenta exposição à internet ao mesmo painel sem senha, com
+      33 séries não redistribuíveis dentro. Não fazer sem autenticação na frente.
+      (c) PÁGINA GERADA e publicada, como este painel de projeto: funciona em qualquer lugar sem
+      a máquina ligada, e é só leitura. Para dado de série exigiria escolher o que pode sair.
+      Escrever o script de (a) foi recusado pelo classificador, corretamente: juntava vincular
+      aplicativo sem autenticação a 0.0.0.0 com comandos de firewall. Os comandos ficaram com o
+      dono, que é de quem a decisão é.
+
   - id: B01
     titulo: "Interface funcional sobre a base e os modelos"
     estado: aprovado

@@ -101,12 +101,13 @@ transformacao = st.sidebar.selectbox(
 info = ficha(conceito, entidade)
 st.title(info["title"] or f"{conceito}@{entidade}")
 
-alto, meio, baixo = st.columns([2, 1, 1])
-alto.caption(f"`{info['series_id']}` · {info['source']}")
-meio.caption(f"{info['unit'] or '—'} · frequência {info['freq']}")
-baixo.caption(
-    ("dessazonalizada" if info["seasonal_adj"] else "sem ajuste sazonal")
-    + f" · defasagem {info['expected_lag_days']} dias"
+# Uma linha que quebra sozinha, em vez de três colunas que se espremem. No Streamlit as colunas
+# NÃO empilham em tela estreita: num celular viram três tiras ilegíveis lado a lado.
+st.caption(
+    f"`{info['series_id']}` · {info['source']} · {info['unit'] or '—'} · "
+    f"frequência {info['freq']} · "
+    + ("dessazonalizada" if info["seasonal_adj"] else "sem ajuste sazonal")
+    + f" · defasagem de {info['expected_lag_days']} dias"
 )
 
 if not info["redistributable"]:
@@ -134,12 +135,12 @@ if dados.empty:
 grafico = dados.set_index("period")["value"]
 st.line_chart(grafico, height=380)
 
-esq, dir = st.columns([1, 1])
-with esq:
-    st.subheader("Últimas observações")
+# Abas em vez de colunas: elas ocupam a largura toda em qualquer tela, e no celular a segunda
+# fica a um toque em vez de espremida ao lado da primeira.
+recentes, cobertura = st.tabs(["Últimas observações", "Cobertura"])
+with recentes:
     st.dataframe(dados.tail(12).iloc[::-1], hide_index=True, width="stretch")
-with dir:
-    st.subheader("Cobertura")
+with cobertura:
     st.dataframe(
         pd.DataFrame(
             [

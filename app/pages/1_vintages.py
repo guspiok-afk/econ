@@ -124,15 +124,14 @@ comum = lado_a_lado.dropna()
 temos = not comum.empty
 revisoes = (comum.iloc[:, 1] - comum.iloc[:, 0]) if temos else pd.Series(dtype="float64")
 
-esq, dir = st.columns([1, 1])
-with esq:
-    st.subheader("Onde mudou")
+# abas, não colunas: ver `app/painel.py` sobre o que colunas fazem numa tela de celular
+mudanca, numeros = st.tabs(["Onde mudou", "Em números"])
+with mudanca:
     if not temos:
         st.caption("Nenhum período em comum entre as duas leituras.")
     else:
         st.line_chart(revisoes.rename("revisão"), height=240)
-with dir:
-    st.subheader("Em números")
+with numeros:
     st.dataframe(
         pd.DataFrame(
             # tudo como texto: uma coluna que mistura número e travessão é objeto para o pandas,
