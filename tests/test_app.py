@@ -264,3 +264,82 @@ def test_as_telas_usam_abas_e_nao_colunas(app: AppTest, vintages: AppTest) -> No
     for tela in (app, vintages):
         assert len(tela.tabs) >= 2, "as seções de baixo deveriam ser abas"
         assert not tela.columns, "colunas voltaram: elas não empilham no celular"
+
+
+# ------------------------------------------------------------------ a porta
+def com_senha(monkeypatch, valor: str = "abre-te"):
+    """Configura a senha e limpa o cache de settings, que é memorizado por processo."""
+    from econbase import settings
+
+    monkeypatch.setenv("ECONBASE_APP_PASSWORD", valor)
+    settings.get_settings.cache_clear()
+    return valor
+
+
+def test_sem_senha_configurada_a_vista_abre_e_diz_que_esta_aberta(app: AppTest) -> None:
+    """O padrão é aberto de propósito: senha obrigatória para uso local seria cerimônia sem
+    ganho, e cerimônia sem ganho ensina a contornar. O que não pode é ficar calada."""
+    legendas = " ".join(c.value.lower() for c in app.sidebar.caption)
+    assert "sem senha" in legendas
+
+
+def test_com_senha_a_porta_tranca_antes_do_dado(monkeypatch) -> None:
+    """A verificação que importa: nada da série aparece antes da senha.
+
+    Um portão que desenha a tela e só depois pede a senha não é portão. Como cada página do
+    Streamlit reexecuta o script inteiro, `st.stop()` no topo é o que garante que a leitura do
+    store nem começa.
+    """
+    from econbase import settings
+
+    com_senha(monkeypatch)
+    try:
+        trancada = AppTest.from_file(SCRIPT, default_timeout=180).run()
+        assert not trancada.exception, [str(e.value) for e in trancada.exception]
+        assert trancada.text_input, "nenhum campo de senha"
+        assert trancada.text_input[0].label == "Senha"
+        # `.type` do AppTest é o tipo do elemento ("text_input"), não o modo do campo — o
+        # mascaramento se verifica na fonte
+        assert 'type="password"' in (ROOT / "app" / "acesso.py").read_text(encoding="utf-8")
+        assert not trancada.dataframe, "a tela desenhou dado antes de pedir a senha"
+        assert not trancada.sidebar.selectbox, "os controles apareceram antes da senha"
+    finally:
+        monkeypatch.delenv("ECONBASE_APP_PASSWORD", raising=False)
+        settings.get_settings.cache_clear()
+
+
+def test_a_senha_certa_abre_e_a_errada_nao(monkeypatch) -> None:
+    from econbase import settings
+
+    senha = com_senha(monkeypatch)
+    try:
+        errada = AppTest.from_file(SCRIPT, default_timeout=180).run()
+        errada.text_input[0].set_value("não é essa").run()
+        errada.button[0].click().run()
+        assert errada.error, "senha errada passou sem reclamar"
+        assert not errada.dataframe
+
+        certa = AppTest.from_file(SCRIPT, default_timeout=180).run()
+        certa.text_input[0].set_value(senha).run()
+        certa.button[0].click().run()
+        assert not certa.exception, [str(e.value) for e in certa.exception]
+        assert certa.dataframe, "a senha certa não abriu a tela"
+    finally:
+        monkeypatch.delenv("ECONBASE_APP_PASSWORD", raising=False)
+        settings.get_settings.cache_clear()
+
+
+def test_a_comparacao_da_senha_e_em_tempo_constante() -> None:
+    """`==` em segredo vaza o prefixo certo pelo tempo de resposta. É barato não fazer isso."""
+    fonte = (ROOT / "app" / "acesso.py").read_text(encoding="utf-8")
+    assert "hmac.compare_digest" in fonte
+
+
+def test_todas_as_paginas_passam_pela_porta() -> None:
+    """Uma página que esqueça de chamar `exigir_senha` é uma porta dos fundos — e a página nova
+    é sempre a que esquece."""
+    for pagina in sorted((ROOT / "app").rglob("*.py")):
+        if pagina.name == "acesso.py":
+            continue
+        fonte = pagina.read_text(encoding="utf-8")
+        assert "exigir_senha()" in fonte, f"{pagina.name} não chama exigir_senha()"

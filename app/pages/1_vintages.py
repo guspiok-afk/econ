@@ -17,15 +17,26 @@ desenho; qualquer coisa além disso vira função com teste do outro lado.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _Path
+
+# A pasta do aplicativo não entra no `sys.path` quando o Streamlit executa uma página —
+# medido, não suposto — então a porta de entrada precisa ser alcançável assim, antes de
+# qualquer outro import do próprio aplicativo.
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import datetime as dt
 
 import pandas as pd
 import streamlit as st
+from acesso import aviso_de_modo_aberto, exigir_senha
 
 from econbase.api import connect
 from econbase.vintages import VINTAGE_KINDS, VintageError
 
 st.set_page_config(page_title="Vintages", page_icon="🕰️", layout="wide")
+
+exigir_senha()
 
 
 @st.cache_resource
@@ -46,6 +57,7 @@ def leitura(concept: str, entity: str, asof: dt.date | None, kind: str) -> tuple
 
 
 st.sidebar.title("Vintages")
+aviso_de_modo_aberto()
 
 todas = catalogo()
 apenas_livres = st.sidebar.toggle("Só o que pode sair daqui", value=False)

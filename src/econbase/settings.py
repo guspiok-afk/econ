@@ -122,6 +122,10 @@ class Settings(BaseSettings):
     econbase_tz: str | None = DEFAULT_TZ
     econbase_http_timeout: float = 30.0
     fred_api_key: str | None = None
+    #: Senha da vista. Vazia significa vista aberta, que é o certo para uso local e o errado no
+    #: momento em que o aplicativo passa a atender na rede — ver ADR-0008 e o item B06 do roadmap.
+    #: Mora no `.env`, que é ignorado pelo git; nunca no repositório.
+    econbase_app_password: str | None = None
 
     @field_validator("econbase_data_dir", "fred_api_key", "econbase_tz", mode="before")
     @classmethod

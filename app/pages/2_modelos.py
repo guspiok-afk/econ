@@ -19,11 +19,20 @@ ADR-0008: nada é calculado aqui. `econmodels.run.run_spec` monta o painel e aju
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _Path
+
+# A pasta do aplicativo não entra no `sys.path` quando o Streamlit executa uma página —
+# medido, não suposto — então a porta de entrada precisa ser alcançável assim, antes de
+# qualquer outro import do próprio aplicativo.
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
 import datetime as dt
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+from acesso import aviso_de_modo_aberto, exigir_senha
 
 import econmodels.decomposition
 import econmodels.phillips  # noqa: F401  registra o modelo
@@ -32,6 +41,8 @@ from econmodels.run import RunError, run_spec
 from econmodels.specs import load_specs
 
 st.set_page_config(page_title="Modelos", page_icon="🧪", layout="wide")
+
+exigir_senha()
 RAIZ = Path(__file__).resolve().parents[2]
 
 
@@ -69,6 +80,7 @@ def desenhavel(tabela: pd.DataFrame) -> pd.DataFrame:
 
 
 st.sidebar.title("Modelos")
+aviso_de_modo_aberto()
 catalogo_specs = especificacoes()
 if not catalogo_specs:
     st.error("Nenhuma especificação em `specs/`.")
