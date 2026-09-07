@@ -95,7 +95,7 @@ def available() -> dict[str, type[Model]]:
 # --------------------------------------------------------------------- the panel a model gets
 #: Calendar grids a declared frequency implies. Daily and business-daily series have no grid to
 #: check against — holidays are not holes — so they are deliberately absent.
-_GRID: dict[str, str] = {"M": "MS", "Q": "QS", "A": "YS", "W": "W-MON"}
+_GRID: dict[str, str] = {"M": "MS", "Q": "QS", "A": "YS", "W": "7D"}
 
 
 class PanelError(ValueError):
