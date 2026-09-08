@@ -27,6 +27,11 @@ dependencies = [
 [project.optional-dependencies]
 # Analysis stack arrives with the analyses (WP-04+); kept here so `uv sync --extra models` is stable.
 models = ["statsmodels>=0.15", "scipy>=1.14"]
+# O banco de ensaio (tools/bench_nowcast.py) NÃO tem extra aqui, de propósito.
+# `uv sync --extra bench` instalaria torch e mais dezoito pacotes no mesmo ambiente que o
+# agendador usa duas vezes por dia — foi o que aconteceu na primeira tentativa. Um extra
+# declarado é um convite a sincronizá-lo. O ensaio roda em ambiente efêmero:
+#   uv run --with torch --with chronos-forecasting python tools/bench_nowcast.py
 
 [project.scripts]
 econbase = "econbase.cli:app"

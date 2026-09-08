@@ -49,6 +49,20 @@ class Key:
         return self.concept or self.spec.series_id
 
 
+#: Coarseness order, so a ragged panel can tell "quarterly onto monthly" (keep the holes) from
+#: "daily onto monthly" (still aggregate). Equal ranks are not coarser than one another.
+_COARSENESS: dict[str, int] = {"D": 0, "B": 0, "W": 1, "M": 2, "Q": 3, "A": 4}
+
+
+def _coarser_than(series_freq: str, grid_freq: str) -> bool:
+    """Is ``series_freq`` a longer period than ``grid_freq``?"""
+    left = _COARSENESS.get(series_freq)
+    right = _COARSENESS.get(grid_freq)
+    if left is None or right is None:
+        raise ApiError(f"cannot compare frequencies {series_freq!r} and {grid_freq!r}")
+    return left > right
+
+
 class Api:
     """Read access to one store through one catalog."""
 
@@ -205,6 +219,7 @@ class Api:
         agg: str | None = None,
         transform: str | None = None,
         how: str = "outer",
+        mixed_freq: bool = False,
     ) -> pd.DataFrame:
         """Several series aligned on one period index, one column each.
 
@@ -221,10 +236,27 @@ class Api:
         The index is a ``DatetimeIndex``: models resample, filter and shift on it, and every
         test fixture in this repository parses its dates, so returning anything else would mean
         validating a model against one kind of index and running it on another.
+
+        ``mixed_freq`` is the one deliberate exception to the rule that a panel has a frequency.
+        Normally a quarterly series asked for on a monthly grid is refused, because interpolating
+        between quarters is a modelling choice and not a conversion. A mixed-frequency model is
+        precisely the place where that choice is made — with a state space rather than with a
+        straight line — so it needs the quarterly figures placed on the monthly grid and the
+        eleven months in between left **empty**. Setting the flag does exactly that: every series
+        keeps its native periods, nothing is aggregated and nothing is filled, and the result is
+        a ragged panel of holes that the model is expected to know how to read. It requires an
+        explicit ``freq``, since the grid is no longer inferable from the data.
         """
         wanted = list(keys)
         if not wanted:
             raise ApiError("get_panel needs at least one key")
+        if mixed_freq and freq is None:
+            raise ApiError(
+                "mixed_freq needs an explicit freq: it names the grid the ragged panel sits on, "
+                "and with several frequencies present there is nothing to infer it from"
+            )
+        if mixed_freq and agg is not None:
+            raise ApiError("mixed_freq places series on their native periods, so agg cannot apply")
         pairs = [k for k in wanted if isinstance(k, tuple)]
         if pairs and entities:
             raise ApiError(
@@ -250,14 +282,19 @@ class Api:
             # one panel mixes frequencies, so the aggregation only travels to the series that
             # are actually being converted; `get` still rejects a pointless agg on its own
             resolved = self.resolve(key, ent)
+            # only a series *coarser* than the grid keeps its native periods. A finer one still
+            # has to be aggregated: left alone it would land on dates that are not grid points
+            # and the reindex below would drop it without a word.
+            coarser = mixed_freq and _coarser_than(resolved.spec.freq, str(freq))
             needs_agg = freq is not None and freq != resolved.spec.freq
             frame = self.get(
                 key,
                 entity=ent,
                 asof=asof,
                 vintage_kind=vintage_kind,
-                freq=freq,
-                agg=agg if needs_agg else None,
+                # a ragged panel keeps the coarse series exactly as published
+                freq=None if coarser else freq,
+                agg=None if coarser else (agg if needs_agg else None),
                 transform=transform,
                 as_pandas=True,
             )
@@ -269,6 +306,21 @@ class Api:
         panel = pd.concat(columns.values(), axis=1, join="inner" if how == "inner" else "outer")
         panel = panel.sort_index()
         panel.index = pd.DatetimeIndex(panel.index)
+        if mixed_freq:
+            # the union of monthly and quarterly periods is not a complete monthly grid: a
+            # quarter the monthly series do not reach would leave a hole, and a model that
+            # counts periods would silently count wrong
+            rule = transforms._PANDAS_RULE.get(str(freq))
+            if rule is None:
+                raise ApiError(f"unknown freq {freq!r} for a mixed-frequency panel")
+            grid = pd.date_range(panel.index.min(), panel.index.max(), freq=rule)
+            off_grid = panel.loc[panel.index.difference(grid)]
+            if off_grid.notna().to_numpy().any():
+                raise ApiError(
+                    f"{int(off_grid.notna().to_numpy().sum())} observation(s) fall off the "
+                    f"{freq} grid and would be dropped silently by a ragged panel"
+                )
+            panel = panel.reindex(grid)
         panel.index.name = "period"
         return _trim_index(panel, _as_date(start, "start"), _as_date(end, "end"))
 
