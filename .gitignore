@@ -36,3 +36,6 @@ notebooks/**/outputs/
 Thumbs.db
 desktop.ini
 .aider*
+
+# Saída do banco de ensaio: derivada, refazível, e o CSV cresce a cada execução.
+reports/bench_*.csv

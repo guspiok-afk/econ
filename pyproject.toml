@@ -27,6 +27,10 @@ dependencies = [
 [project.optional-dependencies]
 # Analysis stack arrives with the analyses (WP-04+); kept here so `uv sync --extra models` is stable.
 models = ["statsmodels>=0.15", "scipy>=1.14"]
+# Só para o banco de ensaio contra modelos de fundação. Extra e pesado de propósito: o agendador
+# atualiza a base numa máquina que não precisa de torch, e arrastá-lo para lá seria trocar
+# robustez da coleta por conveniência de uma comparação que roda uma vez por mês.
+bench = ["torch>=2.4", "chronos-forecasting>=1.5"]
 
 [project.scripts]
 econbase = "econbase.cli:app"

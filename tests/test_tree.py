@@ -47,6 +47,8 @@ LOAD_BEARING = [
     "src/econmodels/taylor.py",
     "src/econmodels/var.py",
     "src/econmodels/dfm.py",
+    "tools/bench_nowcast.py",
+    "docs/work-packages/WP-05g-bench.md",
     # operations
     "scripts/daily.ps1",
     "scripts/backup.ps1",
