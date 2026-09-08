@@ -120,9 +120,60 @@ def test_o_relatorio_diz_que_o_chronos_e_univariado(bench) -> None:
     assert "univariado" in bench.relatar(quadro)
 
 
+# ------------------------------------------------------------------ integridade dos pesos
+def test_o_hash_dos_pesos_e_conferido_a_cada_execucao(bench, tmp_path) -> None:
+    """Conferir uma vez à mão não vale nada.
+
+    O arquivo mora fora do repositório, num diretório gravável, e ninguém repete a conferência
+    antes de cada execução. Aqui ela é repetida por construção — e o teste verifica que ela
+    RECUSA, porque uma guarda que nunca disse não é decoração.
+    """
+    falso = tmp_path / "model.safetensors"
+    falso.write_bytes(b"nao sao os pesos")
+    with pytest.raises(RuntimeError, match="nao e o arquivo esperado"):
+        bench.conferir_pesos(falso, bench.SHA_CHRONOS_BOLT_TINY)
+
+    import hashlib
+
+    real = hashlib.sha256(b"nao sao os pesos").hexdigest()
+    assert bench.conferir_pesos(falso, real) == real
+
+
+def test_o_codigo_do_modelo_nunca_e_executado(bench) -> None:
+    """`safetensors` não executa nada ao ser lido, ao contrário do pickle dos modelos antigos, e
+    `trust_remote_code` fica desligado. O risco deste arranjo nunca foram os pesos."""
+    fonte = SCRIPT.read_text(encoding="utf-8")
+    assert "trust_remote_code=False" in fonte
+    assert "trust_remote_code=True" not in fonte
+
+
+def test_o_ensaio_nao_e_dependencia_do_projeto() -> None:
+    """torch e as dezoito dependências dele não podem entrar no ambiente que atualiza a base
+    duas vezes por dia. Um extra declarado é um convite a sincronizá-lo — foi o que aconteceu na
+    primeira tentativa, e o ambiente do agendador ficou com torch dentro."""
+    import tomllib
+
+    # a declaração, não a palavra: a primeira versão deste teste procurava "torch" no texto e
+    # falhava no próprio comentário que explica por que ele não está lá
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    projeto = config["project"]
+    declaradas = list(projeto.get("dependencies", []))
+    for pacote in projeto.get("optional-dependencies", {}).values():
+        declaradas += list(pacote)
+    pesados = [
+        d
+        for d in declaradas
+        if d.split(">")[0].split("=")[0].strip() in {"torch", "chronos-forecasting", "transformers"}
+    ]
+    assert not pesados, f"o ensaio virou dependência do projeto: {pesados}"
+    assert "uv run --with torch" in SCRIPT.read_text(encoding="utf-8")
+
+
 # ------------------------------------------------------------------ com os pesos, se existirem
 def test_o_chronos_preve_um_numero_plausivel(bench) -> None:
-    pytest.importorskip("chronos", reason="a comparação é um extra: uv sync --extra bench")
+    pytest.importorskip(
+        "chronos", reason="roda em ambiente efêmero: uv run --with chronos-forecasting"
+    )
     pesos = Path(bench.PESOS_PADRAO) / "chronos-bolt-tiny"
     if not (pesos / "config.json").exists():
         pytest.skip(f"pesos ausentes em {pesos}")

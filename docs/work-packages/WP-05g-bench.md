@@ -49,14 +49,33 @@ nelas que ele entrega. Mas coloca um preço no resto do tempo.
 - **Trinta e dois trimestres.** Diferença de três centésimos em n=28 não separa modelo nenhum.
 - **O Chronos vê menos por desenho.** É o ponto da comparação, e não uma desvantagem a corrigir.
 
-## Como rodar
+## Como rodar, e o que foi feito para reduzir o risco
 
 ```
-uv run --extra bench --extra models python tools/bench_nowcast.py
+uv run --with torch --with chronos-forecasting python tools/bench_nowcast.py
 ```
 
-Os pesos ficam em `%LOCALAPPDATA%\econbase\models\chronos-bolt-tiny` e não no repositório: peso de
-modelo não é código. Dezenove segundos em CPU para os 32 trimestres.
+**Ambiente efêmero, não extra do projeto.** A primeira versão declarava `bench` em
+`optional-dependencies`, e o `uv sync --extra bench` instalou torch e mais dezoito pacotes no
+mesmo `.venv` que o agendador usa duas vezes por dia — exatamente o que o extra existia para
+evitar. Um extra declarado é um convite a sincronizá-lo. Ele saiu do `pyproject`, o ambiente foi
+restaurado, e um teste falha se torch voltar a ser dependência.
+
+**O hash é conferido a cada execução, não uma vez à mão.** `carregar_chronos` recusa se o
+`model.safetensors` não bater com o sha256 registrado. O arquivo mora fora do repositório, num
+diretório gravável; conferir uma vez e confiar para sempre não é conferir.
+
+**Nenhum código do modelo roda.** `safetensors` é o formato que existe para não executar nada ao
+ser lido, ao contrário do pickle dos modelos antigos, e `trust_remote_code=False` é explícito no
+código e verificado em teste.
+
+O risco que **permanece** são as bibliotecas: `torch`, `chronos-forecasting` e as dependências
+delas são código executável do PyPI que ninguém auditou. É maior que o dos pesos, e é por isso que
+o ambiente efêmero importa mais que o hash.
+
+Os pesos ficam em `%LOCALAPPDATA%\econbase\models\chronos-bolt-tiny`: peso de modelo não é
+código e não entra no git. Cerca de quarenta segundos para os 32 trimestres, contando a montagem
+do ambiente.
 
 ## O que travou o caminho, e o que isso revelou
 

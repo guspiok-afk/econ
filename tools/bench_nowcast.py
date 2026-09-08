@@ -19,8 +19,10 @@ estimar.
 Os pesos ficam fora do repositório, em `%LOCALAPPDATA%\\econbase\\models`, pela mesma razão que os
 dados ficam: peso de modelo não é código e não entra no git.
 
-Uso:
-    uv run --extra bench --extra models python tools/bench_nowcast.py [--modelo <caminho>]
+Uso, em ambiente EFÊMERO — torch e as dezoito dependências dele não entram no ambiente que o
+agendador usa duas vezes por dia:
+
+    uv run --with torch --with chronos-forecasting python tools/bench_nowcast.py
 """
 
 from __future__ import annotations
@@ -74,12 +76,51 @@ def crescimento(painel: pd.DataFrame) -> pd.Series:
     return taxa
 
 
-def carregar_chronos(caminho: Path):
+#: sha256 de `model.safetensors` de amazon/chronos-bolt-tiny, conferido contra o que o Hub
+#: publica em 07/09/2026. Conferir uma vez à mão não vale nada: o arquivo mora fora do
+#: repositório, num diretório gravável, e ninguém repete a conferência antes de cada execução.
+#: Aqui ela é repetida por construção.
+SHA_CHRONOS_BOLT_TINY = "75068728d376d2bec670379eeef4bfb4d24c0cfe24d957451f8d19b447030a32"
+
+
+def conferir_pesos(arquivo: Path, esperado: str) -> str:
+    """O sha256 do arquivo, recusando se não for o esperado.
+
+    Isto NÃO protege contra tudo. O hash de referência foi obtido pelo mesmo canal TLS que o
+    antivírus desta máquina intercepta, então ele guarda contra corrupção e contra um CDN
+    adulterado, e não contra o próprio interceptador. É a garantia que se pode dar, dita pelo
+    tamanho que tem.
+    """
+    import hashlib
+
+    digestor = hashlib.sha256()
+    with arquivo.open("rb") as fluxo:
+        for bloco in iter(lambda: fluxo.read(1 << 20), b""):
+            digestor.update(bloco)
+    obtido = digestor.hexdigest()
+    if obtido != esperado:
+        raise RuntimeError(
+            f"{arquivo.name} nao e o arquivo esperado. "
+            f"esperado {esperado}, obtido {obtido}. "
+            "Apague o diretorio e baixe de novo antes de rodar qualquer coisa."
+        )
+    return obtido
+
+
+def carregar_chronos(caminho: Path, esperado: str = SHA_CHRONOS_BOLT_TINY):
+    """Carrega os pesos depois de conferi-los.
+
+    `safetensors` é o formato que existe para NÃO executar código ao ser lido, ao contrário do
+    pickle dos modelos antigos, e `trust_remote_code` fica no padrão desligado — nenhum código do
+    repositório do modelo roda aqui. O risco real deste arranjo nunca foram os pesos: são as
+    bibliotecas, e é por isso que elas rodam em ambiente efêmero.
+    """
     import torch
     from chronos import BaseChronosPipeline
 
+    conferir_pesos(caminho / "model.safetensors", esperado)
     return BaseChronosPipeline.from_pretrained(
-        str(caminho), device_map="cpu", torch_dtype=torch.float32
+        str(caminho), device_map="cpu", torch_dtype=torch.float32, trust_remote_code=False
     )
 
 
