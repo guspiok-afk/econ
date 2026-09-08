@@ -58,10 +58,30 @@ uv run --extra bench --extra models python tools/bench_nowcast.py
 Os pesos ficam em `%LOCALAPPDATA%\econbase\models\chronos-bolt-tiny` e não no repositório: peso de
 modelo não é código. Dezenove segundos em CPU para os 32 trimestres.
 
-## Uma coisa do ambiente que travou o caminho
+## O que travou o caminho, e o que isso revelou
 
-O cliente Python não consegue verificar o certificado de `huggingface.co` — falha em
-`CERTIFICATE_VERIFY_FAILED`, embora o `Invoke-WebRequest` do PowerShell, que usa o repositório de
-certificados do Windows, funcione. Os conectores do FRED e do BCB usam `httpx` e não têm esse
-problema, então é específico daquele domínio nesta máquina. Registrado como lacuna L09.
-Contornado baixando os pesos pelo caminho que funciona; **nenhuma verificação foi desabilitada**.
+O cliente Python não conseguia verificar o certificado de `huggingface.co`. Investigado até o
+fim, e a explicação corrige o que a primeira versão desta seção afirmava:
+
+**O Norton intercepta TLS nesta máquina — todo ele, não só o Hugging Face.** O certificado que
+chega ao navegador para `huggingface.co` é emitido por `CN=Norton Web/Mail Shield Root, OU=generated
+by Norton Antivirus for SSL/TLS scanning`, e o do `api.stlouisfed.org` também. O ambiente confirma:
+`SSLKEYLOGFILE` aponta para um pipe do Norton e `NODE_EXTRA_CA_CERTS` para o PEM dele.
+
+Os conectores deste projeto funcionam porque `sources/http.py` já resolve isso da forma certa:
+`ssl.create_default_context()` usa o repositório do sistema, onde a raiz do Norton está, então a
+verificação continua **ligada**. O `transformers` e o `huggingface_hub` usam o pacote `certifi`,
+que não conhece essa raiz — daí a falha. Não é o domínio; é a biblioteca.
+
+Consequências que valem estar escritas:
+
+- Todo o tráfego HTTPS desta máquina passa **descriptografado** pelo antivírus. Isso inclui a
+  chave do FRED, que viaja na query string. Não é comprometimento, é o modelo de ameaça real de
+  quem roda um antivírus com inspeção de TLS.
+- A conferência de hash que fiz nos pesos veio pelo mesmo canal interceptado. Ela protege contra
+  corrupção e contra um CDN adulterado, e **não** contra o próprio interceptador.
+- A correção limpa para as bibliotecas que usam `certifi` é apontar `SSL_CERT_FILE` para um
+  pacote que inclua a raiz do Norton — nunca desabilitar verificação.
+
+Contornado baixando os pesos pelo caminho que já verifica pelo repositório do sistema, e
+**nenhuma verificação foi desabilitada**. Registrado como lacuna L09.
